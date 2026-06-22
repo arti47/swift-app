@@ -286,6 +286,13 @@
             width: auto; margin: 0; font-weight: normal; cursor: pointer;
         }
         .my-standing { margin-top: 16px; font-size: 18px; font-weight: bold; color: var(--primary); }
+        .assign-banner {
+            background: #1e293b; border: 1px solid var(--primary);
+            color: var(--primary); font-weight: bold;
+            padding: 12px 16px; border-radius: 12px; margin-bottom: 14px; text-align: center;
+        }
+        .post.assigned { border-left-color: var(--primary); box-shadow: 0 0 0 2px rgba(56,189,248,0.35); }
+        .assign-tag { color: var(--primary); font-weight: bold; font-size: 13px; letter-spacing: 1px; margin-bottom: 6px; }
         .stuck-btn {
             width: auto; margin: 0; padding: 8px 16px; font-size: 15px;
             background: var(--card-2); border: 1px solid var(--border); color: var(--muted);
@@ -403,6 +410,7 @@
     <!-- Voting / podium phase -->
     <div id="phase2" class="hidden">
         <h2 id="feedTitle">🗳 Vote for the Best Answers</h2>
+        <div class="assign-banner hidden" id="assignBanner"></div>
         <div class="question-banner" id="questionText2"></div>
         <div class="card hidden question-image" id="questionImageWrap2">
             <img id="questionImage2" alt="Question image">
@@ -1016,6 +1024,12 @@
         const numOf = {};
         bySubmit.forEach((p, i) => numOf[p.id] = i + 1);
 
+        // Directed critiques: the specific peers this student must critique
+        // (null = no assignment set for this round → open critiquing).
+        const myAssigned = (session.assignments)
+            ? (session.assignments[meKey()] || []) : null;
+        const assignedSet = myAssigned ? new Set(myAssigned) : null;
+
         let posts = [...bySubmit];
         if (phase === 'podium') {
             posts.sort((a, b) => (b.upvotes || 0) - (a.upvotes || 0));
@@ -1023,9 +1037,21 @@
             const wIdx = posts.findIndex(p => p.id === winnerId);
             if (wIdx > 0) posts.unshift(posts.splice(wIdx, 1)[0]);
         } else {
-            // Own post pinned first during voting
-            const mineIdx = posts.findIndex(p => p.id === myPostId);
-            if (mineIdx > 0) posts.unshift(posts.splice(mineIdx, 1)[0]);
+            // Voting: own post first, then the answers assigned to me, then the rest
+            posts.sort((a, b) => {
+                const rank = p => p.id === myPostId ? 0 : (assignedSet && assignedSet.has(p.id) ? 1 : 2);
+                return rank(a) - rank(b);
+            });
+        }
+
+        // Banner telling the student which answers to critique
+        const ab = document.getElementById('assignBanner');
+        if (phase === 'vote' && assignedSet && assignedSet.size) {
+            const nums = [...assignedSet].map(id => '#' + numOf[id]).filter(n => n !== '#undefined');
+            ab.textContent = `📋 You've been asked to critique ${nums.join(', ')} — they're at the top.`;
+            ab.classList.remove('hidden');
+        } else {
+            ab.classList.add('hidden');
         }
 
         document.getElementById('feedCount').textContent =
@@ -1054,12 +1080,17 @@
             const podium = phase === 'podium';
             const canAct = phase === 'vote' && !mine && (voted || left > 0);
             const critiquedThis = localStorage.getItem(critKeyFor(post.id));
-            const canCritique = phase === 'vote' && !mine && !critiquedThis && cLeft > 0;
+            const isAssigned = assignedSet ? assignedSet.has(post.id) : false;
+            // Restricted: if assignments exist, you may only critique your assigned peers.
+            const allowedToCritique = assignedSet ? isAssigned : true;
+            const canCritique = phase === 'vote' && !mine && !critiquedThis && cLeft > 0 && allowedToCritique;
 
             const postEl = document.createElement('div');
-            postEl.className = 'card post' + (mine ? ' mine' : '') + (isModel ? ' model' : '');
+            postEl.className = 'card post' + (mine ? ' mine' : '') + (isModel ? ' model' : '')
+                + (phase === 'vote' && isAssigned ? ' assigned' : '');
 
             let html = `
+                ${phase === 'vote' && isAssigned ? '<div class="assign-tag">📋 Critique this one</div>' : ''}
                 ${isModel ? '<div class="model-tag">🏆 MODEL ANSWER — CLASS CHAMPION</div>' : ''}
                 <div class="post-header" onclick="togglePost('${post.id}')">
                     <span class="ph-name"><span class="chev">${open ? '▾' : '▸'}</span>${displayName}${mine ? ' (you)' : ''}</span>

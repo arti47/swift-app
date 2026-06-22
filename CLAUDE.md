@@ -93,6 +93,7 @@ session/current                     # the one live round, or null when idle
   paused         bool                      # timer paused (teacher live control)
   pauseLeft      ms                        # remaining time captured while paused
   stuck          { nameKey: name }         # students who tapped "I'm stuck" (answer phase; teacher-only)
+  assignments    { nameKey: [postId,...] } # directed critiques: which peers each student must critique (set at Open Voting)
   startedAt      server timestamp
   redoOf         roundId                   # present only on a redo round
   podium         { first|second|third: {id, name} }   # set when validated
@@ -221,8 +222,6 @@ Ordered roughly by teaching value. Confirm scope with the teacher before buildin
 
 - **Mark-scheme overlay for "Tally the Marks"** — optional official mark
   allocation attached to a question, revealed at podium (predict → verify).
-- **Spread the critiques** — assign each student a few specific peers to
-  critique so feedback covers the whole class, not just the top of the feed.
 - **Per-dimension trend over time** — track which dimension the class is weakest
   on across lessons (data already in CSV; needs a teacher-facing view).
 - **Question bank polish** — richer library/search beyond the 10 lesson slots.
@@ -257,6 +256,13 @@ Ordered roughly by teaching value. Confirm scope with the teacher before buildin
 
 Keep newest first. One line per meaningful change. Dates in YYYY-MM-DD.
 
+- 2026-06-22 — **Directed critiques (assign + restrict).** When the teacher opens
+  voting, the app assigns each submitter **N specific peers** to critique (N = the
+  critique budget), spread evenly cyclically so every answer gets ~N critiques.
+  Students may **only** critique their assigned answers (shown first, highlighted,
+  with a banner); voting stays open to all. Stored at `session.assignments`
+  (`{nameKey:[postId]}`). Backward-compatible: rounds with no assignments allow
+  open critiquing. No new top-level paths.
 - 2026-06-22 — Effectiveness/QoL batch: **(5)** students see their **own points &
   rank** on the waiting/locked screens; teacher shows **📈 Most Improved** (biggest
   upvote gain vs first attempt) at a redo podium. **(6)** student **"🙋 I'm stuck"**

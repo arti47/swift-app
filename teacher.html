@@ -1268,7 +1268,29 @@
     }
 
     function openVoting() {
-        db.ref('session/current').update({ phase: 'vote' });
+        // Directed critiques: give each submitter N specific peers to critique
+        // (N = the critique budget), spread evenly so every answer gets feedback.
+        const N = sessionData && sessionData.critLimit != null ? sessionData.critLimit : 3;
+        db.ref('session/current').update({
+            phase: 'vote',
+            assignments: buildAssignments(latestPosts, N)
+        });
+    }
+
+    function buildAssignments(posts, N) {
+        const entries = Object.entries(posts)
+            .map(([id, p]) => ({ id, key: scoreKey(p.name), t: p.submittedAt || 0 }))
+            .sort((a, b) => a.t - b.t);
+        const n = entries.length;
+        const out = {};
+        if (n <= 1 || N <= 0) return out;
+        const k = Math.min(N, n - 1);          // can't critique yourself
+        entries.forEach((e, i) => {
+            const list = [];
+            for (let j = 1; j <= k; j++) list.push(entries[(i + j) % n].id); // next k, cyclic
+            out[e.key] = list;
+        });
+        return out;
     }
 
     // ---- Live timer controls (extend / pause) ----
