@@ -141,6 +141,19 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
+    // Multi-tenant: everything lives under rooms/<roomCode>/…
+    const room = ((new URLSearchParams(location.search)).get('room')
+        || localStorage.getItem('swift-room') || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (room) localStorage.setItem('swift-room', room);
+    function ref(p) { return firebase.database().ref('rooms/' + room + (p ? '/' + p : '')); }
+    if (!room) {
+        document.body.innerHTML = '<div class="container"><div class="card" style="text-align:center;">' +
+            '<h2>Enter your class room code</h2><input type="text" id="rc" placeholder="e.g. MRTAN" ' +
+            'style="text-transform:uppercase;"><button onclick="(function(){var c=document.getElementById(\'rc\').value.toUpperCase().replace(/[^A-Z0-9]/g,\'\');' +
+            'if(c){location.search=\'?room=\'+c;}})()">Open my book</button></div></div>';
+        throw new Error('no room');
+    }
+
     function esc(str) {
         const div = document.createElement('div');
         div.textContent = str || '';
@@ -161,7 +174,7 @@
     }
 
     let roster = [];
-    db.ref('settings/roster').once('value').then(snap => {
+    ref('settings/roster').once('value').then(snap => {
         roster = snap.val() || [];
         const saved = localStorage.getItem('swift-name') || '';
         if (roster.length) {
@@ -188,7 +201,7 @@
             : document.getElementById('nameInput').value.trim();
         if (!name) { alert('Pick or type your name first.'); return; }
 
-        db.ref('identities/' + nameKey(name)).once('value').then(snap => {
+        ref('identities/' + nameKey(name)).once('value').then(snap => {
             const rec = snap.val();
             if (rec && rec.pin) {
                 const entered = prompt(`Enter ${name}'s 4-digit PIN to open this book:`);
@@ -203,8 +216,8 @@
         const me = name.toLowerCase();
 
         Promise.all([
-            db.ref('rounds').once('value'),
-            db.ref('posts').once('value')
+            ref('rounds').once('value'),
+            ref('posts').once('value')
         ]).then(([rSnap, pSnap]) => {
             const rounds = rSnap.val() || {};
             const allPosts = pSnap.val() || {};

@@ -540,6 +540,15 @@
         </div>
 
         <div class="card">
+            <h2>📥 Import from another room</h2>
+            <p class="muted" style="text-align:left;">Copy a colleague's class or lesson into your room. Ask them for their room code.</p>
+            <label for="importRoom">Their room code</label>
+            <input type="text" id="importRoom" placeholder="e.g. MSLEE" style="text-transform:uppercase;">
+            <button class="greenbtn" style="width:100%;" onclick="loadImportRoom()">🔍 Load their classes & lessons</button>
+            <div id="importView" style="margin-top:12px;"></div>
+        </div>
+
+        <div class="card">
             <h2>🗄 Manage</h2>
             <label for="exportClass">Download responses — class</label>
             <select id="exportClass"></select>
@@ -586,6 +595,20 @@
 <script>
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
+
+    // Multi-tenant: this console operates ONE room (rooms/<roomCode>/…). The
+    // teacher picks a room code (their space); everything is namespaced under it,
+    // so multiple teachers can run live lessons at the same time without colliding.
+    let room = (localStorage.getItem('swift-room') || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    function ref(p) { return firebase.database().ref('rooms/' + room + (p ? '/' + p : '')); }
+    if (!room) {
+        document.body.innerHTML = '<div style="max-width:380px;margin:60px auto;font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#1e293b;border:1px solid #334155;border-radius:14px;padding:24px;color:#e2e8f0;text-align:center;">' +
+            '<h2>🏫 Your room</h2><p style="color:#94a3b8;">Choose a room code for your classes (e.g. your name or initials). You’ll use the same code every time; students join via its QR.</p>' +
+            '<input type="text" id="rc" placeholder="e.g. MRTAN" style="text-transform:uppercase;width:100%;padding:12px;font-size:18px;border-radius:10px;border:1px solid #334155;background:#243349;color:#e2e8f0;">' +
+            '<button style="width:100%;margin-top:12px;padding:14px;border:none;border-radius:10px;background:linear-gradient(135deg,#38bdf8,#2563eb);color:#fff;font-weight:bold;font-size:17px;" ' +
+            'onclick="(function(){var c=document.getElementById(\'rc\').value.toUpperCase().replace(/[^A-Z0-9]/g,\'\'); if(c.length<2){alert(\'Pick a code of at least 2 letters/numbers.\');return;} localStorage.setItem(\'swift-room\',c); location.reload();})()">Continue</button></div>';
+        throw new Error('no room');
+    }
 
     // Connection banner: warn the teacher if the console loses the server.
     let connTimer = null;
@@ -651,26 +674,29 @@
     }
 
     // ---- PIN gate (deterrent against student mischief, not real security) ----
+    // PIN is per-room; the device-cached check is keyed per room too.
+    const pinCacheKey = 'swift-teacher-pin-' + room;
     function unlock() { document.getElementById('pinGate').classList.add('hidden'); }
-    db.ref('settings/pin').once('value').then(snap => {
+    ref('settings/pin').once('value').then(snap => {
         const pin = snap.val();
         if (!pin) {
             document.getElementById('pinMsg').textContent =
-                'First visit — choose a 4-digit PIN for this console:';
+                'New room “' + room + '” — choose a 4-digit PIN for this console:';
             window.checkPin = function() {
                 const p = document.getElementById('pinInput').value;
                 if (!/^\d{4}$/.test(p)) { alert('PIN must be exactly 4 digits.'); return; }
-                db.ref('settings/pin').set(p);
-                localStorage.setItem('swift-teacher-pin', p);
+                ref('settings/pin').set(p);
+                localStorage.setItem(pinCacheKey, p);
+                migrateLegacyIfFirstRoom();
                 unlock();
             };
-        } else if (localStorage.getItem('swift-teacher-pin') === pin) {
+        } else if (localStorage.getItem(pinCacheKey) === pin) {
             unlock();
         } else {
             window.checkPin = function() {
                 const p = document.getElementById('pinInput').value;
                 if (p === pin) {
-                    localStorage.setItem('swift-teacher-pin', p);
+                    localStorage.setItem(pinCacheKey, p);
                     unlock();
                 } else {
                     document.getElementById('pinMsg').textContent = 'Wrong PIN — try again.';
@@ -679,15 +705,45 @@
             };
         }
     });
+
+    // One-time migration: fold the old single-teacher data (the legacy global
+    // classes/lessons/scores/roster) into the FIRST room created. Guarded by a
+    // global `migrated` flag so later rooms start empty.
+    function migrateLegacyIfFirstRoom() {
+        db.ref('migrated').once('value').then(snap => {
+            if (snap.val()) return; // legacy already migrated into some room
+            Promise.all([
+                db.ref('classes').once('value'),
+                db.ref('lessons').once('value'),
+                db.ref('scores').once('value'),
+                db.ref('settings/roster').once('value'),
+                db.ref('settings/activeClass').once('value')
+            ]).then(([c, l, s, r, a]) => {
+                const updates = {};
+                if (c.val()) updates['classes'] = c.val();
+                if (l.val()) updates['lessons'] = l.val();
+                if (s.val()) updates['scores'] = s.val();
+                if (r.val()) updates['settings/roster'] = r.val();
+                if (a.val()) updates['settings/activeClass'] = a.val();
+                if (Object.keys(updates).length) {
+                    ref().update(updates);
+                    alert('Your existing classes, lessons and scores have been copied into room “' + room + '”.');
+                }
+                db.ref('migrated').set(room);
+            }).catch(() => {});
+        }).catch(() => {});
+    }
     function checkPin() { /* replaced above once settings load */ }
     document.getElementById('pinInput').addEventListener('keydown', e => {
         if (e.key === 'Enter') window.checkPin();
     });
 
     // ---- QR code for students (generated locally; same-origin, no third party) ----
-    const studentUrl = window.location.href.replace(/teacher\.html.*$/, '');
+    // The join URL carries this room's code so students land in the right room.
+    const baseUrl = window.location.href.replace(/teacher\.html.*$/, '');
+    const studentUrl = baseUrl + '?room=' + room;
     document.getElementById('studentUrl').textContent = studentUrl;
-    document.getElementById('projUrl').textContent = studentUrl + 'projector.html';
+    document.getElementById('projUrl').textContent = baseUrl + 'projector.html?room=' + room;
     if (typeof QRCode !== 'undefined') {
         new QRCode(document.getElementById('qrImg'),
             { text: studentUrl, width: 180, height: 180, correctLevel: QRCode.CorrectLevel.M });
@@ -699,7 +755,7 @@
     let activeClass = null;   // { slot, name }
     let rosterNames = [];     // roster of the ACTIVE class (mirrored at settings/roster)
 
-    db.ref('classes').on('value', snap => {
+    ref('classes').on('value', snap => {
         classesData = snap.val() || {};
         refreshClassUI();
         if (!classesLoaded) { classesLoaded = true; loadClassSlot(); }
@@ -708,13 +764,13 @@
             '⚠️ Cannot load classes — your Firebase rules must allow the "classes" path.';
     });
 
-    db.ref('settings/roster').on('value', snap => {
+    ref('settings/roster').on('value', snap => {
         rosterNames = snap.val() || [];
         updateMissing();
         updateActiveClassBar();
     });
 
-    db.ref('settings/activeClass').on('value', snap => {
+    ref('settings/activeClass').on('value', snap => {
         activeClass = snap.val();
         document.getElementById('activeClassLabel').textContent = activeClass
             ? `✅ Active class: ${activeClass.name}.`
@@ -763,21 +819,21 @@
 
     function saveClass() {
         const { slot, name, roster } = readClassForm();
-        db.ref('classes/' + slot).set({ name, roster }).then(() => {
+        ref('classes/' + slot).set({ name, roster }).then(() => {
             document.getElementById('rosterStatus').textContent =
                 `Saved "${name}" — ${roster.length} students.`;
             // Keep the live roster in sync if this class is the active one
             if (activeClass && String(activeClass.slot) === String(slot)) {
-                db.ref('settings/roster').set(roster);
+                ref('settings/roster').set(roster);
             }
         });
     }
 
     function setActiveClass() {
         const { slot, name, roster } = readClassForm();
-        db.ref('classes/' + slot).set({ name, roster });
-        db.ref('settings/activeClass').set({ slot, name });
-        db.ref('settings/roster').set(roster);
+        ref('classes/' + slot).set({ name, roster });
+        ref('settings/activeClass').set({ slot, name });
+        ref('settings/roster').set(roster);
         document.getElementById('rosterStatus').textContent = '';
     }
 
@@ -787,7 +843,7 @@
         const roster = readClassForm().roster;
         const box = document.getElementById('pinList');
         if (!roster.length) { box.innerHTML = '<p class="muted" style="text-align:left;">Add roster names first.</p>'; return; }
-        db.ref('identities').once('value').then(snap => {
+        ref('identities').once('value').then(snap => {
             const ids = snap.val() || {};
             box.innerHTML = roster.map(n => {
                 const has = ids[scoreKey(n)] && ids[scoreKey(n)].pin;
@@ -802,7 +858,7 @@
     }
     function resetPin(name) {
         if (!confirm(`Clear ${name}'s PIN? They'll set a new one next time they log in.`)) return;
-        db.ref('identities/' + scoreKey(name)).remove().then(loadPinList);
+        ref('identities/' + scoreKey(name)).remove().then(loadPinList);
     }
 
     // ---- Lessons (up to 10 slots × up to 10 questions) ----
@@ -810,7 +866,7 @@
     let selectedQ = null;   // index of the lesson question armed for pushing
     let lessonsLoaded = false;
 
-    db.ref('lessons').on('value', snap => {
+    ref('lessons').on('value', snap => {
         lessons = snap.val() || {};
         refreshLessonUI();
         if (!lessonsLoaded) { lessonsLoaded = true; lessonSlotChanged(); }
@@ -857,12 +913,12 @@
         const slot = curLessonSlot();
         const L = lessons[slot] || { questions: [] };
         L.name = document.getElementById('lessonName').value.trim() || ('Lesson ' + slot);
-        db.ref('lessons/' + slot).set(L);
+        ref('lessons/' + slot).set(L);
     }
 
     function deleteLesson() {
         if (!confirm('Delete this whole lesson and its questions? (Past answers from classes are kept.)')) return;
-        db.ref('lessons/' + curLessonSlot()).remove();
+        ref('lessons/' + curLessonSlot()).remove();
         localStorage.removeItem(nextIdxKey(curLessonSlot()));
     }
 
@@ -895,7 +951,7 @@
             L.questions.push(entry);
         }
         if (!L.name) L.name = document.getElementById('lessonName').value.trim() || ('Lesson ' + slot);
-        db.ref('lessons/' + slot).set(L).then(() => {
+        ref('lessons/' + slot).set(L).then(() => {
             clearComposeBox();
         });
     }
@@ -975,7 +1031,7 @@
         if (j < 0 || j >= L.questions.length) return;
         [L.questions[i], L.questions[j]] = [L.questions[j], L.questions[i]];
         selectedQ = null; // positions changed — clear to avoid a stale highlight
-        db.ref('lessons/' + slot).set(L);
+        ref('lessons/' + slot).set(L);
     }
 
     function delQ(i) {
@@ -983,7 +1039,7 @@
         if (!L || !L.questions) return;
         L.questions.splice(i, 1);
         selectedQ = null;
-        db.ref('lessons/' + slot).set(L);
+        ref('lessons/' + slot).set(L);
     }
 
     // ---- Drag-and-drop reordering of lesson questions ----
@@ -1015,7 +1071,7 @@
         L.questions.splice(i, 0, moved); // insert at the drop position
         dragSrcIdx = null;
         selectedQ = null;
-        db.ref('lessons/' + slot).set(L);
+        ref('lessons/' + slot).set(L);
     }
     function lessonDragEnd(e) {
         dragSrcIdx = null;
@@ -1030,7 +1086,7 @@
         if (!confirmNoClass()) return;
         if (!confirmInterrupt()) return;
         const roundId = 'r' + Date.now();
-        db.ref('session/current').set({
+        ref('session/current').set({
             roundId: roundId,
             question: ql.q,
             image: ql.image || null,
@@ -1042,7 +1098,7 @@
             timerMins: ql.mins > 0 ? ql.mins : 3,
             startedAt: firebase.database.ServerValue.TIMESTAMP
         });
-        db.ref('rounds/' + roundId).set({
+        ref('rounds/' + roundId).set({
             question: ql.q,
             hadImage: !!ql.image,
             model: ql.model || null,
@@ -1145,8 +1201,8 @@
         if (!typeConfirm('DELETE', 'Delete all rounds (questions + answers + critiques) older than 30 days? Scores and the roster are kept. This cannot be undone.')) return;
         const cutoff = Date.now() - 30 * 24 * 3600 * 1000;
         Promise.all([
-            db.ref('rounds').once('value'),
-            db.ref('posts').once('value')
+            ref('rounds').once('value'),
+            ref('posts').once('value')
         ]).then(([r, p]) => {
             const updates = {};
             let n = 0;
@@ -1159,7 +1215,7 @@
                 }
             });
             if (!n) { alert('No rounds older than 30 days — nothing to delete.'); return; }
-            db.ref().update(updates).then(() => alert(n + ' old round(s) deleted.'));
+            ref().update(updates).then(() => alert(n + ' old round(s) deleted.'));
         });
     }
 
@@ -1251,7 +1307,7 @@
         const voteLimit = parseInt(document.getElementById('qVoteLimitRun').value, 10);
         const critLimit = parseInt(document.getElementById('qCritLimitRun').value, 10);
 
-        db.ref('session/current').set({
+        ref('session/current').set({
             roundId: roundId,
             question: questionText,
             image: questionImageRun,
@@ -1264,7 +1320,7 @@
             startedAt: firebase.database.ServerValue.TIMESTAMP
         });
         // Permanent record so the CSV export can pair answers with questions
-        db.ref('rounds/' + roundId).set({
+        ref('rounds/' + roundId).set({
             question: questionText,
             hadImage: !!questionImageRun,
             class: classTag(),
@@ -1283,7 +1339,7 @@
         // Directed critiques: give each submitter N specific peers to critique
         // (N = the critique budget), spread evenly so every answer gets feedback.
         const N = sessionData && sessionData.critLimit != null ? sessionData.critLimit : 3;
-        db.ref('session/current').update({
+        ref('session/current').update({
             phase: 'vote',
             assignments: buildAssignments(latestPosts, N)
         });
@@ -1309,27 +1365,27 @@
     function extendTimer(mins) {
         if (!sessionData || !sessionData.roundId) return;
         if (sessionData.paused && sessionData.pauseLeft != null) {
-            db.ref('session/current/pauseLeft').set(sessionData.pauseLeft + mins * 60000);
+            ref('session/current/pauseLeft').set(sessionData.pauseLeft + mins * 60000);
             return;
         }
         const cur = sessionData.endsAt;
         const base = (cur && cur > Date.now()) ? cur : Date.now();
-        db.ref('session/current/endsAt').set(base + mins * 60000);
+        ref('session/current/endsAt').set(base + mins * 60000);
     }
     function resetTimer() {
         if (!sessionData || !sessionData.roundId) return;
         const mins = sessionData.timerMins || 3;
-        db.ref('session/current').update({ endsAt: Date.now() + mins * 60000, paused: false, pauseLeft: null });
+        ref('session/current').update({ endsAt: Date.now() + mins * 60000, paused: false, pauseLeft: null });
     }
     function togglePause() {
         if (!sessionData || !sessionData.roundId) return;
         if (sessionData.paused) { // resume
             const left = sessionData.pauseLeft != null ? sessionData.pauseLeft : 0;
-            db.ref('session/current').update({ paused: false, endsAt: Date.now() + left, pauseLeft: null });
+            ref('session/current').update({ paused: false, endsAt: Date.now() + left, pauseLeft: null });
         } else {
             if (!sessionData.endsAt) { alert('No timer running to pause. Use +1m / +2m to start one.'); return; }
             const left = Math.max(0, sessionData.endsAt - Date.now());
-            db.ref('session/current').update({ paused: true, pauseLeft: left });
+            ref('session/current').update({ paused: true, pauseLeft: left });
         }
     }
 
@@ -1341,7 +1397,7 @@
         const roundId = 'r' + Date.now();
         const origin = sessionData.redoOf || sessionData.roundId;
 
-        db.ref('session/current').set({
+        ref('session/current').set({
             roundId: roundId,
             question: sessionData.question,
             image: sessionData.image || null,
@@ -1354,7 +1410,7 @@
             redoOf: origin,
             startedAt: firebase.database.ServerValue.TIMESTAMP
         });
-        db.ref('rounds/' + roundId).set({
+        ref('rounds/' + roundId).set({
             question: '(Redo) ' + sessionData.question,
             hadImage: !!sessionData.image,
             model: sessionData.model || null,
@@ -1367,33 +1423,33 @@
     // ---- Spotlight: project one answer (anonymous) for class discussion ----
     function toggleSpotlight(postId) {
         const cur = sessionData && sessionData.spotlight;
-        db.ref('session/current/spotlight').set(cur === postId ? null : postId);
+        ref('session/current/spotlight').set(cur === postId ? null : postId);
     }
 
     // ---- Delete a student's answer (e.g. inappropriate or a duplicate) ----
     function deletePost(postId) {
         const p = latestPosts[postId];
         if (!confirm(`Delete ${p && p.name ? '"' + p.name + '"' : 'this'} answer? This removes it for everyone and can't be undone.`)) return;
-        if (sessionData && sessionData.spotlight === postId) db.ref('session/current/spotlight').set(null);
-        db.ref(`posts/${currentRound}/${postId}`).remove();
+        if (sessionData && sessionData.spotlight === postId) ref('session/current/spotlight').set(null);
+        ref(`posts/${currentRound}/${postId}`).remove();
     }
 
     // ---- Flip the projector to the model answer (podium debrief) ----
     function toggleModelProjector() {
         const cur = sessionData && sessionData.showModel;
-        db.ref('session/current/showModel').set(!cur);
+        ref('session/current/showModel').set(!cur);
     }
 
     function clearBoard() {
         if (!typeConfirm('END', 'End the round? Student screens go back to "waiting". (Scores are kept.)')) return;
-        db.ref('session/current').remove();
+        ref('session/current').remove();
         document.getElementById('validatePanel').classList.add('hidden');
     }
 
     function resetScores() {
         const who = activeClass ? `"${activeClass.name}"` : 'the shared scoreboard';
         if (!typeConfirm('RESET', `Reset all points to zero for ${who}?`)) return;
-        db.ref(scoresPath()).remove();
+        ref(scoresPath()).remove();
     }
 
     // ---- Points (each class has its own scoreboard) ----
@@ -1408,7 +1464,7 @@
         return activeClass ? { slot: String(activeClass.slot), name: activeClass.name } : null;
     }
     function addPoints(name, pts) {
-        db.ref(scoresPath() + '/' + scoreKey(name)).transaction(cur => ({
+        ref(scoresPath() + '/' + scoreKey(name)).transaction(cur => ({
             name: name,
             points: ((cur && cur.points) || 0) + pts
         }));
@@ -1417,7 +1473,7 @@
     let scoresRef = null;
     function resubscribeScores() {
         if (scoresRef) scoresRef.off();
-        scoresRef = db.ref(scoresPath());
+        scoresRef = ref(scoresPath());
         scoresRef.on('value', renderScores);
     }
 
@@ -1471,7 +1527,7 @@
         }
         const ids = [byPlace['1'], byPlace['2'], byPlace['3']];
 
-        db.ref('rounds/' + currentRound + '/awarded').once('value').then(snap => {
+        ref('rounds/' + currentRound + '/awarded').once('value').then(snap => {
             if (snap.val()) { alert('Points were already awarded for this round.'); return; }
 
             const podium = {
@@ -1483,9 +1539,9 @@
             addPoints(podium.second.name, POINTS.second);
             addPoints(podium.third.name, POINTS.third);
 
-            db.ref('rounds/' + currentRound + '/awarded').set(true);
-            db.ref('rounds/' + currentRound + '/podium').set(podium); // permanent, for review.html
-            db.ref('session/current').update({ phase: 'podium', podium: podium });
+            ref('rounds/' + currentRound + '/awarded').set(true);
+            ref('rounds/' + currentRound + '/podium').set(podium); // permanent, for review.html
+            ref('session/current').update({ phase: 'podium', podium: podium });
 
             document.getElementById('validatePanel').classList.add('hidden');
             runPodiumReveal(podium);
@@ -1534,7 +1590,7 @@
 
     // ---- Star a critique: +1 point to its author, one-way ----
     function starCritique(postId, critId, by) {
-        db.ref(`posts/${currentRound}/${postId}/critiques/${critId}/starred`).set(true);
+        ref(`posts/${currentRound}/${postId}/critiques/${critId}/starred`).set(true);
         addPoints(by, POINTS.star);
     }
 
@@ -1603,7 +1659,7 @@
     }
 
     // ---- Live session / posts / scores ----
-    db.ref('session/current').on('value', snap => {
+    ref('session/current').on('value', snap => {
         sessionData = snap.val();
         const phase = sessionData ? (sessionData.phase || 'answer') : null;
 
@@ -1636,7 +1692,7 @@
             improvedShownFor = null; // recompute "most improved" for the new round
             document.getElementById('validatePanel').classList.add('hidden');
             if (postsRef) postsRef.off();
-            postsRef = db.ref('posts/' + currentRound);
+            postsRef = ref('posts/' + currentRound);
             postsRef.on('value', s => {
                 latestPosts = s.val() || {};
                 renderFeed();
@@ -1782,7 +1838,7 @@
         }
         if (improvedShownFor === currentRound) return; // compute once per round
         improvedShownFor = currentRound;
-        db.ref('posts/' + sessionData.redoOf).once('value').then(snap => {
+        ref('posts/' + sessionData.redoOf).once('value').then(snap => {
             const orig = {};
             Object.values(snap.val() || {}).forEach(p => { orig[scoreKey(p.name)] = (p.upvotes || 0); });
             let best = null;
@@ -1854,13 +1910,61 @@
         }
     }
 
+    // ---- Import classes/lessons from another teacher's room ----
+    function loadImportRoom() {
+        const src = (document.getElementById('importRoom').value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+        const box = document.getElementById('importView');
+        if (!src) { box.innerHTML = '<p class="muted" style="text-align:left;">Enter another teacher\'s room code.</p>'; return; }
+        if (src === room) { box.innerHTML = '<p class="muted" style="text-align:left;">That\'s your own room.</p>'; return; }
+        box.innerHTML = '<p class="muted">Loading…</p>';
+        Promise.all([
+            db.ref('rooms/' + src + '/classes').once('value'),
+            db.ref('rooms/' + src + '/lessons').once('value')
+        ]).then(([c, l]) => {
+            const classes = c.val() || {}, lessons = l.val() || {};
+            let html = '<strong>Classes</strong>', any = false;
+            [1, 2, 3, 4, 5, 6].forEach(i => {
+                if (classes[i] && classes[i].name) {
+                    any = true;
+                    html += `<div class="lesson-row"><span style="flex:1;">${esc(classes[i].name)} · ${(classes[i].roster || []).length} students</span>
+                        <button class="spot-btn" style="margin:0;" onclick="importItem('${src}','classes',${i})">Copy →</button></div>`;
+                }
+            });
+            if (!any) html += '<p class="muted" style="text-align:left;">No classes in that room.</p>';
+            html += '<strong>Lessons</strong>'; any = false;
+            for (let i = 1; i <= 10; i++) {
+                if (lessons[i] && lessons[i].name) {
+                    any = true;
+                    html += `<div class="lesson-row"><span style="flex:1;">${esc(lessons[i].name)} · ${(lessons[i].questions || []).length} Q</span>
+                        <button class="spot-btn" style="margin:0;" onclick="importItem('${src}','lessons',${i})">Copy →</button></div>`;
+                }
+            }
+            if (!any) html += '<p class="muted" style="text-align:left;">No lessons in that room.</p>';
+            box.innerHTML = html;
+        }).catch(() => { box.innerHTML = '<p style="color:#f87171;">Could not read that room — check the code.</p>'; });
+    }
+    function importItem(src, kind, srcSlot) {
+        const max = kind === 'classes' ? 6 : 10;
+        const label = kind === 'classes' ? 'class' : 'lesson';
+        const target = prompt(`Copy into which of your ${label} slots? (1–${max})`);
+        const t = parseInt(target, 10);
+        if (!(t >= 1 && t <= max)) return;
+        db.ref('rooms/' + src + '/' + kind + '/' + srcSlot).once('value').then(s => {
+            const data = s.val();
+            if (!data) return;
+            if (!confirm(`Copy into your ${label} slot ${t}? This overwrites whatever is in that slot.`)) return;
+            ref(kind + '/' + t).set(data).then(() =>
+                alert(`Copied into ${label} slot ${t}. Open it in the ${kind === 'classes' ? 'Classes' : 'Lessons'} card.`));
+        });
+    }
+
     // ---- Past-questions viewer (read-only; doesn't touch the live round) ----
     let historyRounds = {};
     let historyPosts = {};
     function loadHistory() {
         const view = document.getElementById('historyView');
         view.innerHTML = '<p class="muted">Loading…</p>';
-        Promise.all([db.ref('rounds').once('value'), db.ref('posts').once('value')])
+        Promise.all([ref('rounds').once('value'), ref('posts').once('value')])
             .then(([r, p]) => {
                 historyRounds = r.val() || {};
                 historyPosts = p.val() || {};
@@ -1915,9 +2019,9 @@
         const scorePath = classFilter !== 'all' ? 'scores/c' + classFilter : scoresPath();
 
         Promise.all([
-            db.ref('rounds').once('value'),
-            db.ref('posts').once('value'),
-            db.ref(scorePath).once('value')
+            ref('rounds').once('value'),
+            ref('posts').once('value'),
+            ref(scorePath).once('value')
         ]).then(([rSnap, pSnap, sSnap]) => {
             const rounds = rSnap.val() || {};
             const allPosts = pSnap.val() || {};

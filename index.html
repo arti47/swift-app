@@ -435,6 +435,21 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
+    // Multi-tenant: this student belongs to one teacher's room (rooms/<roomCode>/…),
+    // taken from the join QR (?room=CODE) and remembered on the device.
+    const room = ((new URLSearchParams(location.search)).get('room')
+        || localStorage.getItem('swift-room') || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (room) localStorage.setItem('swift-room', room);
+    function ref(p) { return firebase.database().ref('rooms/' + room + (p ? '/' + p : '')); }
+    if (!room) {
+        document.body.innerHTML = '<div class="container"><div class="card" style="text-align:center; max-width:420px; margin:40px auto;">' +
+            '<h2>Join your class</h2><p style="color:#94a3b8;">Scan your teacher’s QR code, or type the room code they show:</p>' +
+            '<input type="text" id="rc" placeholder="e.g. MRTAN" style="text-transform:uppercase; width:100%; padding:12px; font-size:18px; border-radius:10px; border:1px solid #334155; background:#243349; color:#e2e8f0;">' +
+            '<button style="width:100%; margin-top:12px; padding:14px; border:none; border-radius:10px; background:linear-gradient(135deg,#38bdf8,#2563eb); color:#fff; font-weight:bold; font-size:17px;" ' +
+            'onclick="(function(){var c=document.getElementById(\'rc\').value.toUpperCase().replace(/[^A-Z0-9]/g,\'\'); if(c){location.search=\'?room=\'+c;}})()">Join</button></div></div>';
+        throw new Error('no room');
+    }
+
     const VOTES_PER_ROUND = 2;   // fallback only; teacher sets session.voteLimit per round
     const MIN_CHARS = 10;   // minimum characters per dimension ("idk" guard)
 
@@ -483,7 +498,7 @@
     function nameKey(name) {
         return (name || '').trim().toLowerCase().replace(/[.#$\[\]\/]/g, '') || 'anonymous';
     }
-    function identityRefFor(name) { return db.ref('identities/' + nameKey(name)); }
+    function identityRefFor(name) { return ref('identities/' + nameKey(name)); }
 
     // Per-round device state is scoped to the logged-in student, so two students
     // sharing one iPad in the same round don't see each other's answer/votes.
@@ -501,7 +516,7 @@
         localStorage.setItem('swift-idv2', '1');
     }
 
-    db.ref('settings/roster').on('value', s => {
+    ref('settings/roster').on('value', s => {
         rosterList = s.val() || [];
         refreshIdPicker();
     });
@@ -628,7 +643,7 @@
     function toggleStuck() {
         if (!currentRound) return;
         const key = meKey();
-        const ref = db.ref('session/current/stuck/' + key);
+        const ref = ref('session/current/stuck/' + key);
         const on = session && session.stuck && session.stuck[key];
         if (on) ref.remove(); else ref.set(getStudentName() || 'someone');
     }
@@ -642,11 +657,11 @@
 
     // ---- Personal standing: this student's points & rank in the class ----
     let myScoresRef = null;
-    db.ref('settings/activeClass').on('value', s => {
+    ref('settings/activeClass').on('value', s => {
         const ac = s.val();
         const path = 'scores/' + (ac && ac.slot ? 'c' + ac.slot : 'default');
         if (myScoresRef) myScoresRef.off();
-        myScoresRef = db.ref(path);
+        myScoresRef = ref(path);
         myScoresRef.on('value', renderStanding);
     });
     function renderStanding(snap) {
@@ -746,7 +761,7 @@
     }
 
     // ---- Session listener: question, image, timer, phase ----
-    db.ref('session/current').on('value', snap => {
+    ref('session/current').on('value', snap => {
         session = snap.val();
         applySession();
     });
@@ -797,7 +812,7 @@
         if (session.redoOf && !myPostId) loadRedoContext(session.redoOf, hadDraft);
 
         if (postsRef) postsRef.off();
-        postsRef = db.ref('posts/' + currentRound);
+        postsRef = ref('posts/' + currentRound);
         postsRef.on('value', snap => {
             latestPosts = snap.val() || {};
             updateScreen();
@@ -810,7 +825,7 @@
     function loadRedoContext(origRound, hadDraft) {
         const oldId = localStorage.getItem(postKeyFor(origRound));
         if (!oldId) return; // didn't submit in the original round — normal round
-        db.ref('posts/' + origRound + '/' + oldId).once('value').then(snap => {
+        ref('posts/' + origRound + '/' + oldId).once('value').then(snap => {
             const old = snap.val();
             if (!old || myPostId) return;
             // Don't clobber a draft the student already started this round
@@ -909,13 +924,13 @@
             submittedAt: firebase.database.ServerValue.TIMESTAMP
         };
 
-        const ref = db.ref('posts/' + currentRound).push();
+        const ref = ref('posts/' + currentRound).push();
         ref.set(newPost)
             .then(() => {
                 myPostId = ref.key;
                 localStorage.setItem(postKeyFor(currentRound), myPostId);
                 localStorage.removeItem(draftKey()); // locked in — draft no longer needed
-                db.ref('session/current/stuck/' + meKey()).remove(); // no longer stuck
+                ref('session/current/stuck/' + meKey()).remove(); // no longer stuck
                 beep(880, 160); // "locked in" chime
                 updateScreen();
                 window.scrollTo(0, 0);
@@ -955,7 +970,7 @@
     // ---- Self-comparison against the model answer (podium phase) ----
     function selfCheck(dim, val) {
         if (!myPostId) return;
-        db.ref(`posts/${currentRound}/${myPostId}/selfcheck/${dim}`).set(val);
+        ref(`posts/${currentRound}/${myPostId}/selfcheck/${dim}`).set(val);
     }
 
     function renderCompare(winnerId) {
@@ -1154,13 +1169,13 @@
             // un-vote
             localStorage.removeItem(voteKey);
             localStorage.setItem(votesLeftKey(), String(left + 1));
-            db.ref(`posts/${currentRound}/${postId}/upvotes`)
+            ref(`posts/${currentRound}/${postId}/upvotes`)
               .transaction(v => Math.max(0, (v || 0) - 1));
         } else {
             if (left <= 0) return;
             localStorage.setItem(voteKey, '1');
             localStorage.setItem(votesLeftKey(), String(left - 1));
-            db.ref(`posts/${currentRound}/${postId}/upvotes`)
+            ref(`posts/${currentRound}/${postId}/upvotes`)
               .transaction(v => (v || 0) + 1);
         }
     }
@@ -1184,7 +1199,7 @@
         // text isn't restored into the boxes.
         ['affirm', 'clarify', 'suggest'].forEach(f =>
             document.getElementById(`${f}-${postId}`).value = '');
-        db.ref(`posts/${currentRound}/${postId}/critiques`).push({
+        ref(`posts/${currentRound}/${postId}/critiques`).push({
             by: localStorage.getItem('swift-name') || 'Anonymous',
             affirm, clarify, suggest
         });
