@@ -168,6 +168,8 @@
         }
         .qr-row { text-align: center; }
         .qr-row img { border-radius: 10px; background: white; padding: 8px; }
+        .qrbox { display: inline-block; background: #fff; padding: 8px; border-radius: 10px; line-height: 0; }
+        .qrbox img, .qrbox canvas { display: block; }
         .muted { color: var(--muted); text-align: center; }
 
         .post { border-left: 5px solid var(--primary); padding: 14px 18px; }
@@ -524,7 +526,7 @@
 
         <div class="card qr-row">
             <strong>Students scan to join:</strong><br><br>
-            <img id="qrImg" width="180" height="180" alt="QR code">
+            <div id="qrImg" class="qrbox" style="margin:0 auto;"></div>
             <p class="muted" id="studentUrl"></p>
             <p class="muted">🖥 Projector view (open on the classroom screen): <span id="projUrl" style="color:var(--primary);"></span></p>
         </div>
@@ -572,6 +574,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script src="firebase-config.js"></script>
+<script src="qrcode.min.js"></script>
 <script>
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
@@ -673,13 +676,14 @@
         if (e.key === 'Enter') window.checkPin();
     });
 
-    // ---- QR code for students ----
+    // ---- QR code for students (generated locally; same-origin, no third party) ----
     const studentUrl = window.location.href.replace(/teacher\.html.*$/, '');
     document.getElementById('studentUrl').textContent = studentUrl;
     document.getElementById('projUrl').textContent = studentUrl + 'projector.html';
-    document.getElementById('qrImg').src =
-        'https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=' +
-        encodeURIComponent(studentUrl);
+    if (typeof QRCode !== 'undefined') {
+        new QRCode(document.getElementById('qrImg'),
+            { text: studentUrl, width: 180, height: 180, correctLevel: QRCode.CorrectLevel.M });
+    }
 
     // ---- Classes (up to 6 slots), each with a roster + own scoreboard ----
     let classesData = {};
