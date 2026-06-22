@@ -255,6 +255,8 @@ Ordered roughly by teaching value. Confirm scope with the teacher before buildin
 
 Keep newest first. One line per meaningful change. Dates in YYYY-MM-DD.
 
+- 2026-06-22 — Projector now keeps a compact **"scan to join" QR** on the answer
+  and voting screens (not just the idle screen), so latecomers can join mid-round.
 - 2026-06-22 — **Bugfix: shared-iPad identity switch.** Per-round student state
   (submission pointer, draft, vote/critique budgets) was keyed by round only, so
   logging in as a second student on the same device in the same round showed the
