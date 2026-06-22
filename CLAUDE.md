@@ -270,6 +270,9 @@ Ordered roughly by teaching value. Confirm scope with the teacher before buildin
 
 Keep newest first. One line per meaningful change. Dates in YYYY-MM-DD.
 
+- 2026-06-22 — Teacher console header now shows **Room: <code>** and a **🚪 Log out**
+  link (clears the cached room + PIN on this device, returns to the room-login
+  screen — for shared laptops / switching rooms).
 - 2026-06-22 — **Multi-tenant rooms (multiple teachers, concurrent live lessons).**
   Everything is now namespaced under `rooms/<roomCode>/…`. Each teacher logs in
   with a chosen **room code** (+ per-room PIN); students/projector/review carry the

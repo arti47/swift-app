@@ -330,6 +330,8 @@
 
 <div class="container">
     <h1>S.W.I.F.T. <span class="spark">Arena</span> — Teacher Console</h1>
+    <p class="muted" style="text-align:center; margin:-8px 0 14px;">Room: <strong id="roomLabel" style="color:var(--gold);"></strong>
+        &nbsp;·&nbsp; <a href="#" onclick="logoutTeacher();return false;" style="color:var(--primary);">🚪 Log out</a></p>
 
     <div class="tabbar">
         <button id="tabBtnRun" onclick="switchTab('run')">🎬 Run Lesson</button>
@@ -671,6 +673,15 @@
     function typeConfirm(word, msg) {
         const ans = prompt(msg + '\n\nType ' + word + ' to confirm:');
         return ans !== null && ans.trim().toUpperCase() === word;
+    }
+
+    // ---- Room label + log out ----
+    document.getElementById('roomLabel').textContent = room;
+    function logoutTeacher() {
+        if (!confirm('Log out of room “' + room + '”? You\'ll need the room code and PIN to get back in.')) return;
+        localStorage.removeItem('swift-teacher-pin-' + room);
+        localStorage.removeItem('swift-room');
+        location.reload(); // returns to the room-code login screen
     }
 
     // ---- PIN gate (deterrent against student mischief, not real security) ----
