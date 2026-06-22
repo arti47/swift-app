@@ -176,11 +176,30 @@
         }
     });
 
+    function nameKey(name) {
+        return (name || '').trim().toLowerCase().replace(/[.#$\[\]\/]/g, '') || 'anonymous';
+    }
+
+    // Gate the book behind the student's personal PIN (set in the Arena app).
+    // If no PIN exists for that name (or the rules block reads), open it.
     function loadBook() {
         const name = roster.length
             ? document.getElementById('nameSel').value
             : document.getElementById('nameInput').value.trim();
         if (!name) { alert('Pick or type your name first.'); return; }
+
+        db.ref('identities/' + nameKey(name)).once('value').then(snap => {
+            const rec = snap.val();
+            if (rec && rec.pin) {
+                const entered = prompt(`Enter ${name}'s 4-digit PIN to open this book:`);
+                if (entered === null) return;
+                if (entered.trim() !== rec.pin) { alert('Wrong PIN.'); return; }
+            }
+            doLoadBook(name);
+        }).catch(() => doLoadBook(name));
+    }
+
+    function doLoadBook(name) {
         const me = name.toLowerCase();
 
         Promise.all([

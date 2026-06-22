@@ -62,10 +62,10 @@ cleverness.
 
 | File | Role |
 |---|---|
-| `index.html` | **Student app.** Phase-aware: waiting → answer form → locked → voting feed → podium/self-compare. Auto-handle identity, draft auto-save, vote/critique budgets. |
+| `index.html` | **Student app.** Phase-aware: identity gate (pick name + PIN) → waiting → answer form → locked → voting feed → podium/self-compare. Roster+PIN identity, draft auto-save, vote/critique budgets. |
 | `teacher.html` | **Teacher console** (private, on the teacher's laptop/iPad). PIN-gated. Split into two tabs: **🎬 Run Lesson** (live: sticky phase-aware control bar with step strip + one highlighted next-step button, counts & timer, push questions ad-hoc or next-in-sequence, validate podium, star critiques, spotlight, live feed, leaderboard) and **🛠 Setup** (classes, lesson builder, QR/join, CSV export, danger zone). Tab choice persists in `localStorage` (`swift-teacher-tab`). |
 | `projector.html` | **Read-only classroom display** (the big screen). Phase-aware, **anonymity-safe** (never shows names during voting), runs the podium reveal + standings, shows spotlighted answers, and (teacher-triggered at podium) the full-screen model answer for debrief. No PIN. |
-| `review.html` | **Student revision book.** Pick a name/handle → see all past answers, feedback received, and model answers; print/save-as-PDF. |
+| `review.html` | **Student revision book.** Pick a name → enter that student's PIN (if set) → see all past answers, feedback received, and model answers; print/save-as-PDF. |
 | `firebase-config.js` | Firebase project config (shared by all pages). Contains the teacher's real keys. |
 | `CLAUDE.md` | This file. |
 | `.claude/launch.json` | Local preview-server config for testing. |
@@ -125,17 +125,26 @@ classes/<1..6>                      # up to 6 saved classes
 lessons/<1..10>                     # up to 10 saved lessons
   { name, questions: [ {q, image, mins, vote, crit, model}, ... up to 10 ] }
     #   model = { s,w,i,f,t } | null  (teacher's pre-authored model answer)
+
+identities/<nameKey>                # per-student login (NEW TOP-LEVEL PATH — add to rules!)
+  { name, pin }                     # nameKey = name lowercased, punctuation stripped
 ```
 
-**Identity model:** students no longer type a name. Each device generates a
-persistent fun **auto-handle** (e.g. `Otter-318`) stored in `localStorage`
-(`swift-name`). All scoring/podium/review keys off this handle. The class
-**roster** feature still exists in the console but, with auto-handles, it won't
-match handles — so the "not yet submitted" list and roster name-matching are
-effectively dormant unless the teacher's workflow changes. (Kept in place
-intentionally; don't remove without asking.)
+**Identity model:** students **pick their name from the active class roster**
+(`settings/roster`) and unlock it with a personal **4-digit PIN** stored at
+`identities/<nameKey>`. So scoring/podium/review key off the student's real name
+and **follow the student across any iPad and any day**, not the device. The
+chosen name is remembered in `localStorage` (`swift-name`) for one-tap rejoin on
+the same device, but is always re-selectable via the "switch" link. First time a
+name is claimed the student creates its PIN; after that the PIN is required
+(also to open that name's Revision Book). The teacher can reset a forgotten PIN
+from the Classes card. If the roster is empty the student free-types a name; if
+the `identities` path is denied by rules, the app degrades to name-only (no PIN).
+*(Older builds used a silent per-device auto-handle; a one-time `swift-idv2`
+flag clears it so everyone re-picks a real identity on first launch.)*
 
-**Per-device state in `localStorage` (student):** `swift-name` (handle),
+**Per-device state in `localStorage` (student):** `swift-name` (chosen identity),
+`swift-idv2` (migration flag),
 `swift-post-<roundId>` (their submission id), `swift-votesleft-<roundId>`,
 `swift-vote-<roundId>-<postId>`, `swift-critsleft-<roundId>`,
 `swift-crit-<roundId>-<postId>`, `swift-draft-<roundId>` (auto-saved draft).
@@ -210,13 +219,10 @@ Ordered roughly by teaching value. Confirm scope with the teacher before buildin
 - **Room codes / multi-class-simultaneous** — the app assumes ONE class at a
   time; concurrent classes (or a colleague sharing the URL) would collide. Real
   work; only if the need arises.
-- **Per-student protection on review.html** — currently any student can view any
-  handle's history (acceptable since everything is class-visible, but flagged).
 
 ### Known limitations (by design, not bugs)
 - No server-side enforcement (budgets/PIN are client-side).
 - Single class live at a time.
-- Auto-handles mean the teacher can't tie an answer to a named student.
 - `review.html` only shows model answers for rounds validated after that feature
   shipped (older rounds have no stored podium); the 30-day cleanup erases history
   the revision book relies on — advise cleaning up only after exams.
@@ -227,9 +233,10 @@ Ordered roughly by teaching value. Confirm scope with the teacher before buildin
 
 1. Firebase project exists (`swift-analysis-81527`) with Realtime Database in
    `asia-southeast1`; `firebase-config.js` filled in (incl. `databaseURL`).
-2. **Realtime Database rules** allow all seven paths:
-   `session, posts, rounds, scores, settings, classes, lessons` (each
-   `{".read": true, ".write": true}`).
+2. **Realtime Database rules** allow all eight paths:
+   `session, posts, rounds, scores, settings, classes, lessons, identities`
+   (each `{".read": true, ".write": true}`). **`identities` is new — without it,
+   student login/PIN silently degrades to name-only.**
 3. Deploy: drag the whole folder to **app.netlify.com/drop**.
 4. Teacher opens `teacher.html` → sets a PIN on first visit.
 5. Projector opens `projector.html`; students scan the QR to land on `index.html`.
@@ -240,6 +247,15 @@ Ordered roughly by teaching value. Confirm scope with the teacher before buildin
 
 Keep newest first. One line per meaningful change. Dates in YYYY-MM-DD.
 
+- 2026-06-22 — **Student identity overhaul: roster pick + personal PIN.** Replaces
+  the per-device auto-handle. Students choose their name from the active class
+  roster and unlock it with a 4-digit PIN stored at the new `identities/<nameKey>`
+  path, so points/history follow the student across iPads and days. PIN also gates
+  that name's Revision Book. Teacher gets a "Manage student PINs" reset tool in the
+  Classes card. **NEW Firebase path `identities` — must be added to the RTDB rules**
+  (degrades to name-only if absent). One-time `swift-idv2` flag clears old handles.
+  Roster-based "not yet submitted" tracking now works again as a bonus. Closes the
+  "per-student protection on review.html" roadmap item.
 - 2026-06-22 — Teacher live feed reading-load controls: critiques are now
   **collapsed by default** behind a per-answer "💬 N critiques — show" toggle, and
   the feed shows only the **top 8 answers by votes** with a "Show all N" switch.
