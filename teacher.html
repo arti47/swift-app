@@ -527,7 +527,12 @@
 
         <div class="card">
             <h2>🗄 Manage</h2>
-            <button class="greenbtn" style="width:100%;" onclick="exportCSV()">⬇️ Download All Responses (CSV)</button>
+            <label for="exportClass">Download responses — class</label>
+            <select id="exportClass"></select>
+            <label for="exportLesson">Lesson (paper)</label>
+            <select id="exportLesson"></select>
+            <p class="muted" style="text-align:left; font-size:13px; margin:6px 0 0;">Filters apply to rounds pushed after this update; older rounds are untagged and only appear under "All".</p>
+            <button class="greenbtn" style="width:100%;" onclick="exportCSV()">⬇️ Download Responses (CSV)</button>
 
             <div class="danger-zone">
                 <h3>⚠️ Danger zone</h3>
@@ -723,6 +728,7 @@
             return `<option value="${i}">${i}. ${c && c.name ? esc(c.name) : '(empty)'}</option>`;
         }).join('');
         sel.value = cur;
+        populateExportFilters();
     }
 
     function loadClassSlot() {
@@ -820,6 +826,7 @@
 
         renderLessonQs();
         renderRunLesson();
+        populateExportFilters();
     }
 
     function lessonSlotChanged() {
@@ -1023,6 +1030,8 @@
             question: ql.q,
             hadImage: !!ql.image,
             model: ql.model || null,
+            class: classTag(),
+            lesson: { slot: String(slot), name: (lessons[slot] && lessons[slot].name) || ('Lesson ' + slot) },
             startedAt: firebase.database.ServerValue.TIMESTAMP
         });
         localStorage.setItem(nextIdxKey(slot), String(i + 1));
@@ -1242,6 +1251,7 @@
         db.ref('rounds/' + roundId).set({
             question: questionText,
             hadImage: !!questionImageRun,
+            class: classTag(),
             startedAt: firebase.database.ServerValue.TIMESTAMP
         });
 
@@ -1310,6 +1320,7 @@
             question: '(Redo) ' + sessionData.question,
             hadImage: !!sessionData.image,
             model: sessionData.model || null,
+            class: classTag(),
             redoOf: origin,
             startedAt: firebase.database.ServerValue.TIMESTAMP
         });
@@ -1353,6 +1364,10 @@
     }
     function scoresPath() {
         return 'scores/' + (activeClass && activeClass.slot ? 'c' + activeClass.slot : 'default');
+    }
+    // Stamp on each round so the CSV export can filter by class / lesson.
+    function classTag() {
+        return activeClass ? { slot: String(activeClass.slot), name: activeClass.name } : null;
     }
     function addPoints(name, pts) {
         db.ref(scoresPath() + '/' + scoreKey(name)).transaction(cur => ({
@@ -1736,22 +1751,60 @@
         }).join('');
     }
 
-    // ---- CSV export: every round + final scores ----
+    // Populate the export class/lesson dropdowns (called as data loads).
+    function populateExportFilters() {
+        const cSel = document.getElementById('exportClass');
+        if (cSel) {
+            const cur = cSel.value || 'all';
+            let html = '<option value="all">All classes</option>';
+            [1, 2, 3, 4, 5, 6].forEach(i => {
+                const c = classesData[i];
+                if (c && c.name) html += `<option value="${i}">${esc(c.name)}</option>`;
+            });
+            cSel.innerHTML = html; cSel.value = cur;
+        }
+        const lSel = document.getElementById('exportLesson');
+        if (lSel) {
+            const cur = lSel.value || 'all';
+            let html = '<option value="all">All lessons</option><option value="none">Ad-hoc (no lesson)</option>';
+            for (let i = 1; i <= 10; i++) {
+                const L = lessons[i];
+                if (L && L.name) html += `<option value="${i}">${esc(L.name)}</option>`;
+            }
+            lSel.innerHTML = html; lSel.value = cur;
+        }
+    }
+
+    // ---- CSV export: filtered by class / lesson, plus that class's scores ----
     function exportCSV() {
+        const classFilter = (document.getElementById('exportClass') || {}).value || 'all';
+        const lessonFilter = (document.getElementById('exportLesson') || {}).value || 'all';
+        const scorePath = classFilter !== 'all' ? 'scores/c' + classFilter : scoresPath();
+
         Promise.all([
             db.ref('rounds').once('value'),
             db.ref('posts').once('value'),
-            db.ref(scoresPath()).once('value')
+            db.ref(scorePath).once('value')
         ]).then(([rSnap, pSnap, sSnap]) => {
             const rounds = rSnap.val() || {};
             const allPosts = pSnap.val() || {};
             const scores = Object.values(sSnap.val() || {}).sort((a, b) => b.points - a.points);
-            const roundIds = Object.keys(allPosts).sort();
-            if (!roundIds.length) { alert('No responses in the database yet.'); return; }
+
+            const matches = rid => {
+                const meta = rounds[rid] || {};
+                const okClass = classFilter === 'all' ||
+                    (meta.class && String(meta.class.slot) === classFilter);
+                const okLesson = lessonFilter === 'all' ||
+                    (lessonFilter === 'none' ? !meta.lesson
+                        : (meta.lesson && String(meta.lesson.slot) === lessonFilter));
+                return okClass && okLesson;
+            };
+            const roundIds = Object.keys(allPosts).sort().filter(matches);
+            if (!roundIds.length) { alert('No responses match that class / lesson filter.'); return; }
 
             const cell = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
             const rows = [[
-                'Question #', 'Date', 'Question', 'Student',
+                'Question #', 'Date', 'Class', 'Lesson', 'Question', 'Student',
                 'S — Number of Setups', 'W — Command Word', 'I — Idea of Science',
                 'F — Facts / Data', 'T — Tally the Marks',
                 'Upvotes', 'Critiques received'
@@ -1761,12 +1814,14 @@
                 const meta = rounds[rid] || {};
                 const ts = meta.startedAt || parseInt(rid.slice(1), 10);
                 const date = isNaN(ts) ? '' : new Date(ts).toLocaleString();
+                const className = meta.class ? meta.class.name : '';
+                const lessonName = meta.lesson ? meta.lesson.name : '';
                 Object.values(allPosts[rid] || {}).forEach(p => {
                     const crits = Object.values(p.critiques || {})
                         .map(c => `${c.starred ? '⭐ ' : ''}${c.by} — Affirm: ${c.affirm} / Clarify: ${c.clarify} / Suggest: ${c.suggest}`)
                         .join('  ||  ');
                     rows.push([
-                        idx + 1, date, meta.question || '(question not recorded)',
+                        idx + 1, date, className, lessonName, meta.question || '(question not recorded)',
                         p.name, p.s, p.w, p.i, p.f, p.t,
                         p.upvotes || 0, crits
                     ].map(cell).join(','));
@@ -1775,7 +1830,7 @@
 
             if (scores.length) {
                 rows.push('');
-                rows.push([cell('SESSION LEADERBOARD'), cell('Points')].join(','));
+                rows.push([cell('LEADERBOARD'), cell('Points')].join(','));
                 scores.forEach(s => rows.push([cell(s.name), cell(s.points)].join(',')));
             }
 
