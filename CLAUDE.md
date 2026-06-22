@@ -272,6 +272,10 @@ Keep newest first. One line per meaningful change. Dates in YYYY-MM-DD.
   on the student device (audio unlocked by their own tap). **(8)** CSV export now
   includes the **self-check (✅/🔧)** columns per dimension. **(10)** student
   **🔠 bigger-text** accessibility toggle (`swift-textsize`). No new top-level paths.
+- 2026-06-22 — Teacher Setup gains a **🗂 Past Questions** viewer: load past
+  rounds, pick any one from a dropdown, and review its answers/votes/critiques/
+  podium/model read-only (the live console only ever shows the active round; old
+  responses were retained in `rounds`/`posts` but weren't browsable in-app).
 - 2026-06-22 — **QR codes now generated locally** (vendored `qrcode.min.js`,
   same-origin) on `teacher.html` + `projector.html`, replacing the external
   `api.qrserver.com` image service that was blocked on the school network (QR

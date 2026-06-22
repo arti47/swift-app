@@ -532,6 +532,14 @@
         </div>
 
         <div class="card">
+            <h2>🗂 Past Questions</h2>
+            <p class="muted" style="text-align:left;">Review any earlier question's answers, votes, critiques and podium. Read-only — this doesn't change the live round.</p>
+            <button class="greenbtn" style="width:100%;" onclick="loadHistory()">🗂 Load / refresh past questions</button>
+            <select id="historySel" class="hidden" onchange="showHistoryRound()" style="margin-top:10px;"></select>
+            <div id="historyView" style="margin-top:12px;"></div>
+        </div>
+
+        <div class="card">
             <h2>🗄 Manage</h2>
             <label for="exportClass">Download responses — class</label>
             <select id="exportClass"></select>
@@ -1844,6 +1852,60 @@
             }
             lSel.innerHTML = html; lSel.value = cur;
         }
+    }
+
+    // ---- Past-questions viewer (read-only; doesn't touch the live round) ----
+    let historyRounds = {};
+    let historyPosts = {};
+    function loadHistory() {
+        const view = document.getElementById('historyView');
+        view.innerHTML = '<p class="muted">Loading…</p>';
+        Promise.all([db.ref('rounds').once('value'), db.ref('posts').once('value')])
+            .then(([r, p]) => {
+                historyRounds = r.val() || {};
+                historyPosts = p.val() || {};
+                const ids = [...new Set([...Object.keys(historyRounds), ...Object.keys(historyPosts)])]
+                    .sort((a, b) => (parseInt(b.slice(1), 10) || 0) - (parseInt(a.slice(1), 10) || 0));
+                const sel = document.getElementById('historySel');
+                if (!ids.length) { sel.classList.add('hidden'); view.innerHTML = '<p class="muted">No past questions yet.</p>'; return; }
+                sel.innerHTML = ids.map(id => {
+                    const m = historyRounds[id] || {};
+                    const ts = m.startedAt || parseInt(id.slice(1), 10);
+                    const date = isNaN(ts) ? '' : new Date(ts).toLocaleString();
+                    const q = (m.question || '(no question)').slice(0, 50);
+                    const cls = m.class ? ' · ' + m.class.name : '';
+                    return `<option value="${id}">${date}${cls} — ${esc(q)}</option>`;
+                }).join('');
+                sel.classList.remove('hidden');
+                showHistoryRound();
+            }).catch(() => { view.innerHTML = '<p style="color:#f87171;">Could not load history — check the connection.</p>'; });
+    }
+    function showHistoryRound() {
+        const id = document.getElementById('historySel').value;
+        const meta = historyRounds[id] || {};
+        const posts = Object.values(historyPosts[id] || {}).sort((a, b) => (b.upvotes || 0) - (a.upvotes || 0));
+        let html = `<div class="question-banner" style="font-size:18px;">${esc(meta.question || '(question not recorded)')}</div>`;
+        if (meta.podium) {
+            html += `<p class="muted">🥇 ${esc(meta.podium.first.name)} &nbsp; 🥈 ${esc(meta.podium.second.name)} &nbsp; 🥉 ${esc(meta.podium.third.name)}</p>`;
+        }
+        if (meta.model && DIMS.some(([k]) => meta.model[k])) {
+            html += `<div class="card"><strong>🎯 Teacher's model</strong>${renderDims(meta.model)}</div>`;
+        }
+        if (!posts.length) {
+            html += '<p class="muted">No answers recorded for this question.</p>';
+        } else {
+            html += posts.map(p => {
+                const crits = Object.values(p.critiques || {});
+                return `<div class="card post">
+                    <div class="post-head"><span class="post-author">${esc(p.name)}</span><span class="votes">👍 ${p.upvotes || 0}</span></div>
+                    ${renderDims(p)}
+                    ${crits.length ? `<div class="critiques-list">${crits.map(c => `
+                        <div class="crit-row"><span>${c.starred ? '⭐ ' : ''}<em>${esc(c.by)}:</em>
+                            <strong>A:</strong> ${esc(c.affirm)} · <strong>C:</strong> ${esc(c.clarify)} · <strong>S:</strong> ${esc(c.suggest)}</span></div>`).join('')}</div>` : ''}
+                </div>`;
+            }).join('');
+        }
+        document.getElementById('historyView').innerHTML = html;
     }
 
     // ---- CSV export: filtered by class / lesson, plus that class's scores ----
