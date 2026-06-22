@@ -1,0 +1,1308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S.W.I.F.T. Arena — Teacher Console</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --card-2: #243349;
+            --border: #334155;
+            --text: #e2e8f0;
+            --muted: #94a3b8;
+            --primary: #38bdf8;
+            --gold: #fbbf24;
+            --green: #34d399;
+            --dimS: #38bdf8;
+            --dimW: #f472b6;
+            --dimI: #a78bfa;
+            --dimF: #34d399;
+            --dimT: #fb923c;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+        }
+        .container { max-width: 1050px; margin: 0 auto; }
+        .hidden { display: none !important; }
+        h1, h2 { text-align: center; letter-spacing: 1px; }
+        h1 .spark { color: var(--gold); }
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 6px 16px -6px rgba(0, 0, 0, 0.5);
+        }
+        label { font-weight: bold; display: block; margin: 14px 0 5px; }
+        textarea, input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            font-size: 16px;
+            background: var(--card-2);
+            color: var(--text);
+        }
+        textarea { height: 70px; resize: vertical; }
+        select {
+            width: 100%;
+            padding: 10px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--card-2);
+            color: var(--text);
+            font-size: 16px;
+        }
+        button {
+            background: linear-gradient(135deg, #38bdf8, #2563eb);
+            color: white;
+            border: none;
+            padding: 13px 18px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 10px;
+            cursor: pointer;
+            margin-top: 14px;
+            touch-action: manipulation;
+            transition: transform 0.08s ease;
+        }
+        button:active { transform: scale(0.97); }
+        button:disabled { background: #475569; color: #94a3b8; cursor: default; }
+        .danger { background: linear-gradient(135deg, #f87171, #dc2626); }
+        .goldbtn { background: linear-gradient(135deg, #fbbf24, #d97706); color: #451a03; }
+        .greenbtn { background: linear-gradient(135deg, #34d399, #059669); }
+        .controls-row { display: flex; gap: 10px; flex-wrap: wrap; }
+
+        .phase-pill {
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+            padding: 8px;
+            border-radius: 999px;
+            background: var(--card-2);
+            border: 1px solid var(--border);
+            margin-bottom: 16px;
+        }
+
+        .statbar { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; }
+        .stat { text-align: center; padding: 8px 26px; }
+        .stat .num { font-size: 52px; font-weight: bold; color: var(--primary); }
+        .stat .lbl { font-size: 13px; color: var(--muted); text-transform: uppercase; }
+        #timerBig { font-size: 52px; font-weight: bold; color: var(--primary); }
+        #timerBig.urgent { color: #f87171; animation: blink 1s infinite; }
+        @keyframes blink { 50% { opacity: 0.4; } }
+
+        .question-banner {
+            background: linear-gradient(135deg, #1e293b, #312e81);
+            border: 1px solid #4338ca;
+            color: white;
+            padding: 18px 22px;
+            border-radius: 14px;
+            font-size: 22px;
+            margin-bottom: 16px;
+            text-align: center;
+        }
+        .qr-row { text-align: center; }
+        .qr-row img { border-radius: 10px; background: white; padding: 8px; }
+        .muted { color: var(--muted); text-align: center; }
+
+        .post { border-left: 5px solid var(--primary); padding: 14px 18px; }
+        .post.top { border-left-color: var(--gold); background: #2b2410; }
+        .post-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .post-author { font-weight: bold; font-size: 18px; }
+        .votes { font-size: 18px; font-weight: bold; color: var(--gold); }
+        .dimension { margin-bottom: 8px; padding-left: 10px; border-left: 3px solid var(--border); }
+        .dimension.d-s { border-left-color: var(--dimS); } .d-s b { color: var(--dimS); }
+        .dimension.d-w { border-left-color: var(--dimW); } .d-w b { color: var(--dimW); }
+        .dimension.d-i { border-left-color: var(--dimI); } .d-i b { color: var(--dimI); }
+        .dimension.d-f { border-left-color: var(--dimF); } .d-f b { color: var(--dimF); }
+        .dimension.d-t { border-left-color: var(--dimT); } .d-t b { color: var(--dimT); }
+        .dimension b { margin-right: 6px; }
+        .critiques-list {
+            margin-top: 12px;
+            font-size: 0.92em;
+            border-top: 1px solid var(--border);
+            padding-top: 10px;
+            color: #cbd5e1;
+        }
+        .crit-row { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px; }
+        .star-btn {
+            background: none;
+            border: 1px solid var(--gold);
+            color: var(--gold);
+            padding: 3px 10px;
+            margin: 0;
+            font-size: 14px;
+            border-radius: 999px;
+            width: auto;
+            flex-shrink: 0;
+        }
+        .star-btn:disabled { border-color: var(--gold); background: var(--gold); color: #451a03; }
+        .spot-btn {
+            background: none;
+            border: 1px solid var(--primary);
+            color: var(--primary);
+            padding: 5px 12px;
+            margin: 0 10px 0 0;
+            font-size: 14px;
+            border-radius: 999px;
+            width: auto;
+        }
+        .spot-btn.on { background: var(--primary); color: #082f49; }
+        .lesson-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            border-radius: 8px;
+            margin-bottom: 6px;
+            background: var(--card-2);
+            border: 1px solid var(--border);
+        }
+        .lesson-row.next { background: #163a27; border-color: #16a34a; }
+        .lesson-row.selected { outline: 3px solid var(--primary); outline-offset: -1px; }
+        .lesson-row.dragging { opacity: 0.4; }
+        .lesson-row.drag-over { border-top: 3px solid var(--primary); }
+        .drag-handle {
+            cursor: grab;
+            color: var(--muted);
+            font-size: 20px;
+            line-height: 1;
+            user-select: none;
+            padding: 0 2px;
+        }
+        .slot-preview {
+            background: var(--card-2);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px 14px;
+            margin-top: 8px;
+            font-size: 0.95em;
+        }
+        .slot-preview .pv-meta {
+            color: var(--muted);
+            font-size: 13px;
+            margin-bottom: 8px;
+        }
+
+        /* Leaderboard */
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+        th { color: var(--muted); font-size: 13px; text-transform: uppercase; }
+        td.pts { font-weight: bold; color: var(--gold); font-size: 18px; }
+
+        /* Podium overlay */
+        #podiumOverlay {
+            position: fixed; inset: 0;
+            background: rgba(2, 6, 23, 0.96);
+            z-index: 100;
+            display: flex; align-items: center; justify-content: center;
+            overflow: hidden;
+        }
+        .podium-stage { text-align: center; width: 90%; max-width: 800px; }
+        .podium-stage h2 { font-size: 42px; margin: 0 0 30px; color: var(--gold); }
+        .podium-row { display: flex; align-items: flex-end; justify-content: center; gap: 18px; }
+        .podium-slot {
+            width: 30%;
+            opacity: 0;
+            transform: translateY(60px);
+            transition: opacity 0.7s ease, transform 0.7s ease;
+        }
+        .podium-slot.revealed { opacity: 1; transform: translateY(0); }
+        .podium-slot .medal { font-size: 56px; }
+        .podium-slot .pname { font-size: 26px; font-weight: bold; margin: 6px 0; }
+        .podium-slot .ppts { font-size: 20px; color: var(--gold); font-weight: bold; }
+        .podium-slot .bar { border-radius: 10px 10px 0 0; margin-top: 12px; }
+        .bar1 { height: 180px; background: linear-gradient(180deg, #fbbf24, #b45309); }
+        .bar2 { height: 120px; background: linear-gradient(180deg, #cbd5e1, #64748b); }
+        .bar3 { height: 80px;  background: linear-gradient(180deg, #fb923c, #9a3412); }
+        .confetti {
+            position: fixed; top: -40px;
+            font-size: 26px;
+            animation: fall linear forwards;
+            z-index: 101;
+        }
+        @keyframes fall {
+            to { transform: translateY(110vh) rotate(720deg); }
+        }
+
+        /* PIN gate */
+        #pinGate {
+            position: fixed; inset: 0;
+            background: var(--bg);
+            z-index: 200;
+            display: flex; align-items: center; justify-content: center;
+        }
+        #pinGate .card { width: 320px; text-align: center; }
+        #pinInput { text-align: center; font-size: 28px; letter-spacing: 12px; }
+    </style>
+</head>
+<body>
+
+<!-- PIN gate -->
+<div id="pinGate">
+    <div class="card">
+        <h2>🔐 Teacher Console</h2>
+        <p class="muted" id="pinMsg">Enter your PIN</p>
+        <input type="password" id="pinInput" inputmode="numeric" maxlength="4" autocomplete="off">
+        <button onclick="checkPin()" style="width:100%;">Unlock</button>
+    </div>
+</div>
+
+<div class="container">
+    <h1>S.W.I.F.T. <span class="spark">Arena</span> — Teacher Console</h1>
+
+    <div class="phase-pill" id="phasePill">Phase: — no active question —</div>
+
+    <div class="card">
+        <label for="qText">Question to flash on screen</label>
+        <textarea id="qText" placeholder="Type your question here… (optional if you attach an image)"></textarea>
+
+        <label for="qImage">Image (optional — photo, diagram, source…)</label>
+        <input type="file" id="qImage" accept="image/*">
+        <div id="imgPreviewWrap" class="hidden" style="margin-top:10px; text-align:center;">
+            <img id="imgPreview" style="max-width:100%; max-height:300px; border-radius:8px; border:1px solid var(--border);">
+            <br><button type="button" style="padding:8px 16px; margin-top:8px;" class="danger" onclick="removeImage()">✕ Remove image</button>
+        </div>
+
+        <label for="qMinutes">Timer (minutes, optional — leave blank for none)</label>
+        <input type="number" id="qMinutes" min="1" max="60" placeholder="e.g. 5">
+
+        <label for="qCritLimit">Critiques per student this round</label>
+        <input type="number" id="qCritLimit" min="0" max="10" value="2">
+
+        <div class="controls-row">
+            <button onclick="pushQuestion()">🚀 Push Question</button>
+            <button id="addLessonBtn" class="goldbtn" onclick="addToLesson()">➕ Add to Lesson</button>
+            <button id="cancelEditBtn" class="danger hidden" onclick="cancelEditQ()">✕ Cancel Edit</button>
+            <button id="openVotingBtn" class="greenbtn" onclick="openVoting()" disabled>🗳 Open Voting</button>
+            <button id="podiumBtn" class="goldbtn" onclick="showValidation()" disabled>🏆 Validate Top 3</button>
+            <button id="redoBtn" class="greenbtn" onclick="pushRedo()" disabled>🔄 Redo Round</button>
+            <button class="danger" onclick="clearBoard()">🧹 Clear Board</button>
+        </div>
+        <div class="controls-row">
+            <button class="greenbtn" onclick="exportCSV()">⬇️ Download All Responses (CSV)</button>
+            <button class="danger" onclick="resetScores()">🔁 Reset Scores (new session)</button>
+            <button class="danger" onclick="deleteOldRounds()">🗑 Delete Rounds Older Than 30 Days</button>
+            <button id="replayBtn" class="goldbtn hidden" onclick="replayPodium()">🎬 Replay Podium</button>
+        </div>
+    </div>
+
+    <!-- Podium validation panel -->
+    <div class="card hidden" id="validatePanel">
+        <h2>🏆 Validate the Podium</h2>
+        <p class="muted">Pre-filled with the top 3 by student votes. Swap any slot if a top answer doesn't deserve it, then confirm to award points.</p>
+        <label>🥇 1st place (+5 points)</label>
+        <select id="slotSel1" onchange="updateSlotPreview(1)"></select>
+        <div class="slot-preview" id="slotPrev1"></div>
+        <label>🥈 2nd place (+3 points)</label>
+        <select id="slotSel2" onchange="updateSlotPreview(2)"></select>
+        <div class="slot-preview" id="slotPrev2"></div>
+        <label>🥉 3rd place (+2 points)</label>
+        <select id="slotSel3" onchange="updateSlotPreview(3)"></select>
+        <div class="slot-preview" id="slotPrev3"></div>
+        <div class="controls-row">
+            <button class="goldbtn" onclick="confirmPodium()">✓ Confirm & Reveal Podium</button>
+            <button onclick="document.getElementById('validatePanel').classList.add('hidden')">Cancel</button>
+        </div>
+    </div>
+
+    <div class="card qr-row">
+        <strong>Students scan to join:</strong><br><br>
+        <img id="qrImg" width="180" height="180" alt="QR code">
+        <p class="muted" id="studentUrl"></p>
+        <p class="muted">🖥 Projector view (open on the classroom screen): <span id="projUrl" style="color:var(--primary);"></span></p>
+    </div>
+
+    <div class="card">
+        <h2>🏫 Classes</h2>
+        <p class="muted">Up to 6 classes, each with its own roster and its own scoreboard. Pick a slot, fill in the details, then "Use This Class Now" before the lesson starts.</p>
+        <label for="classSlot">Class slot</label>
+        <select id="classSlot" onchange="loadClassSlot()"></select>
+        <label for="className">Class name</label>
+        <input type="text" id="className" placeholder="e.g. 6 Resilience">
+        <label for="rosterText">Roster (one name per line — students pick from this list)</label>
+        <textarea id="rosterText" style="height:130px;" placeholder="Marcus&#10;Ethan&#10;Wei Jie&#10;…"></textarea>
+        <div class="controls-row">
+            <button onclick="saveClass()">💾 Save Class</button>
+            <button class="goldbtn" onclick="setActiveClass()">✅ Use This Class Now</button>
+        </div>
+        <p class="muted"><span id="activeClassLabel"></span> <span id="rosterStatus"></span></p>
+        <div id="missingWrap" class="hidden" style="margin-top:8px;">
+            <strong style="color:#f87171;">⏳ Not yet submitted:</strong>
+            <span id="missingNames"></span>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>📚 Lessons — prepare &amp; run</h2>
+        <p class="muted">Up to 10 saved lessons, each with up to 10 questions. To build: type a question in the box above (with image/timer/critique limit) and hit "➕ Add to Lesson". In class: push the questions one tap at a time.</p>
+        <label for="lessonSlot">Lesson slot</label>
+        <select id="lessonSlot" onchange="lessonSlotChanged()"></select>
+        <label for="lessonName">Lesson name</label>
+        <input type="text" id="lessonName" placeholder="e.g. Energy — Term 3 Week 2">
+        <div class="controls-row">
+            <button onclick="saveLessonName()">💾 Save Name</button>
+            <button class="danger" onclick="deleteLesson()">🗑 Delete Lesson</button>
+        </div>
+        <div id="lessonQs" style="margin-top:14px;"></div>
+    </div>
+
+    <div class="card statbar">
+        <div class="stat"><div class="num" id="countSubmitted">0</div><div class="lbl">Submitted</div></div>
+        <div class="stat"><div class="num" id="countCritiques">0</div><div class="lbl">Critiques</div></div>
+        <div class="stat"><div id="timerBig">–</div><div class="lbl">Time left</div></div>
+    </div>
+
+    <div class="question-banner" id="liveQuestion">No active question</div>
+    <div class="card hidden" id="liveImageWrap" style="text-align:center;">
+        <img id="liveImage" style="max-width:100%; max-height:420px; border-radius:8px;">
+    </div>
+
+    <div class="card hidden" id="selfcheckCard">
+        <h2>🪞 Self-Check Tally</h2>
+        <p class="muted">After the podium, students rate their own answer against the model, dimension by dimension. Red rows = where the class thinks it's weak.</p>
+        <div id="selfcheckRows"></div>
+    </div>
+
+    <div class="card">
+        <h2>🏅 Session Leaderboard</h2>
+        <table>
+            <thead><tr><th>#</th><th>Student</th><th>Points</th></tr></thead>
+            <tbody id="scoreBody"><tr><td colspan="3" class="muted">No points awarded yet.</td></tr></tbody>
+        </table>
+    </div>
+
+    <h2>Live Responses (sorted by votes)</h2>
+    <div id="feedContainer"><p class="muted">Responses will appear here as students submit.</p></div>
+</div>
+
+<!-- Podium reveal overlay -->
+<div id="podiumOverlay" class="hidden">
+    <div class="podium-stage">
+        <h2>🏆 Round Podium</h2>
+        <div class="podium-row">
+            <div class="podium-slot" id="pslot2">
+                <div class="medal">🥈</div><div class="pname"></div><div class="ppts">+3 pts</div><div class="bar bar2"></div>
+            </div>
+            <div class="podium-slot" id="pslot1">
+                <div class="medal">🥇</div><div class="pname"></div><div class="ppts">+5 pts</div><div class="bar bar1"></div>
+            </div>
+            <div class="podium-slot" id="pslot3">
+                <div class="medal">🥉</div><div class="pname"></div><div class="ppts">+2 pts</div><div class="bar bar3"></div>
+            </div>
+        </div>
+        <button class="goldbtn" onclick="closePodium()" style="margin-top:34px; padding:14px 40px;">Close</button>
+    </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    const POINTS = { first: 5, second: 3, third: 2, star: 1 };
+
+    let currentRound = null;
+    let sessionData = null;
+    let postsRef = null;
+    let latestPosts = {};
+    let timerInterval = null;
+
+    function esc(str) {
+        const div = document.createElement('div');
+        div.textContent = str || '';
+        return div.innerHTML;
+    }
+
+    const DIMS = [
+        ['s', 'S — Number of Setups'],
+        ['w', 'W — Command Word'],
+        ['i', 'I — Idea of Science'],
+        ['f', 'F — Facts / Data'],
+        ['t', 'T — Tally the Marks']
+    ];
+    function renderDims(post) {
+        return DIMS.map(([k, label]) =>
+            `<div class="dimension d-${k}"><b>${label}:</b> ${esc(post[k])}</div>`
+        ).join('');
+    }
+
+    // ---- PIN gate (deterrent against student mischief, not real security) ----
+    function unlock() { document.getElementById('pinGate').classList.add('hidden'); }
+    db.ref('settings/pin').once('value').then(snap => {
+        const pin = snap.val();
+        if (!pin) {
+            document.getElementById('pinMsg').textContent =
+                'First visit — choose a 4-digit PIN for this console:';
+            window.checkPin = function() {
+                const p = document.getElementById('pinInput').value;
+                if (!/^\d{4}$/.test(p)) { alert('PIN must be exactly 4 digits.'); return; }
+                db.ref('settings/pin').set(p);
+                localStorage.setItem('swift-teacher-pin', p);
+                unlock();
+            };
+        } else if (localStorage.getItem('swift-teacher-pin') === pin) {
+            unlock();
+        } else {
+            window.checkPin = function() {
+                const p = document.getElementById('pinInput').value;
+                if (p === pin) {
+                    localStorage.setItem('swift-teacher-pin', p);
+                    unlock();
+                } else {
+                    document.getElementById('pinMsg').textContent = 'Wrong PIN — try again.';
+                    document.getElementById('pinInput').value = '';
+                }
+            };
+        }
+    });
+    function checkPin() { /* replaced above once settings load */ }
+    document.getElementById('pinInput').addEventListener('keydown', e => {
+        if (e.key === 'Enter') window.checkPin();
+    });
+
+    // ---- QR code for students ----
+    const studentUrl = window.location.href.replace(/teacher\.html.*$/, '');
+    document.getElementById('studentUrl').textContent = studentUrl;
+    document.getElementById('projUrl').textContent = studentUrl + 'projector.html';
+    document.getElementById('qrImg').src =
+        'https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=' +
+        encodeURIComponent(studentUrl);
+
+    // ---- Classes (up to 6 slots), each with a roster + own scoreboard ----
+    let classesData = {};
+    let classesLoaded = false;
+    let activeClass = null;   // { slot, name }
+    let rosterNames = [];     // roster of the ACTIVE class (mirrored at settings/roster)
+
+    db.ref('classes').on('value', snap => {
+        classesData = snap.val() || {};
+        refreshClassUI();
+        if (!classesLoaded) { classesLoaded = true; loadClassSlot(); }
+    }, err => {
+        document.getElementById('rosterStatus').textContent =
+            '⚠️ Cannot load classes — your Firebase rules must allow the "classes" path.';
+    });
+
+    db.ref('settings/roster').on('value', snap => {
+        rosterNames = snap.val() || [];
+        updateMissing();
+    });
+
+    db.ref('settings/activeClass').on('value', snap => {
+        activeClass = snap.val();
+        document.getElementById('activeClassLabel').textContent = activeClass
+            ? `✅ Active class: ${activeClass.name}.`
+            : 'No active class selected — shared scoreboard, free-typed names.';
+        resubscribeScores();
+    });
+
+    function refreshClassUI() {
+        const sel = document.getElementById('classSlot');
+        const cur = sel.value || '1';
+        sel.innerHTML = [1, 2, 3, 4, 5, 6].map(i => {
+            const c = classesData[i];
+            return `<option value="${i}">${i}. ${c && c.name ? esc(c.name) : '(empty)'}</option>`;
+        }).join('');
+        sel.value = cur;
+    }
+
+    function loadClassSlot() {
+        const c = classesData[document.getElementById('classSlot').value] || {};
+        document.getElementById('className').value = c.name || '';
+        document.getElementById('rosterText').value = (c.roster || []).join('\n');
+    }
+
+    function readClassForm() {
+        const slot = document.getElementById('classSlot').value;
+        const name = document.getElementById('className').value.trim() || ('Class ' + slot);
+        const roster = [...new Set(document.getElementById('rosterText').value
+            .split('\n').map(n => n.trim()).filter(n => n))];
+        return { slot, name, roster };
+    }
+
+    function saveClass() {
+        const { slot, name, roster } = readClassForm();
+        db.ref('classes/' + slot).set({ name, roster }).then(() => {
+            document.getElementById('rosterStatus').textContent =
+                `Saved "${name}" — ${roster.length} students.`;
+            // Keep the live roster in sync if this class is the active one
+            if (activeClass && String(activeClass.slot) === String(slot)) {
+                db.ref('settings/roster').set(roster);
+            }
+        });
+    }
+
+    function setActiveClass() {
+        const { slot, name, roster } = readClassForm();
+        db.ref('classes/' + slot).set({ name, roster });
+        db.ref('settings/activeClass').set({ slot, name });
+        db.ref('settings/roster').set(roster);
+        document.getElementById('rosterStatus').textContent = '';
+    }
+
+    // ---- Lessons (up to 10 slots × up to 10 questions) ----
+    let lessons = {};
+    let selectedQ = null;   // index of the lesson question armed for pushing
+    let lessonsLoaded = false;
+
+    db.ref('lessons').on('value', snap => {
+        lessons = snap.val() || {};
+        refreshLessonUI();
+        if (!lessonsLoaded) { lessonsLoaded = true; lessonSlotChanged(); }
+    }, err => {
+        document.getElementById('lessonQs').innerHTML =
+            '<p style="color:#f87171;">⚠️ Cannot load lessons — your Firebase rules must allow the "lessons" path.</p>';
+    });
+
+    function curLessonSlot() { return document.getElementById('lessonSlot').value || '1'; }
+    function nextIdxKey(slot) { return 'swift-runner-' + slot; }
+
+    function refreshLessonUI() {
+        const sel = document.getElementById('lessonSlot');
+        const cur = sel.value || '1';
+        sel.innerHTML = Array.from({ length: 10 }, (_, i) => i + 1).map(i => {
+            const L = lessons[i];
+            const n = (L && L.questions) ? L.questions.length : 0;
+            return `<option value="${i}">${i}. ${L && L.name ? esc(L.name) : '(empty)'} — ${n} Q${n === 1 ? '' : 's'}</option>`;
+        }).join('');
+        sel.value = cur;
+        renderLessonQs();
+    }
+
+    function lessonSlotChanged() {
+        if (typeof editingQ !== 'undefined' && editingQ !== null) clearComposeBox();
+        selectedQ = null; // selection doesn't carry across lessons
+        const L = lessons[curLessonSlot()] || {};
+        document.getElementById('lessonName').value = L.name || '';
+        renderLessonQs();
+    }
+
+    function saveLessonName() {
+        const slot = curLessonSlot();
+        const L = lessons[slot] || { questions: [] };
+        L.name = document.getElementById('lessonName').value.trim() || ('Lesson ' + slot);
+        db.ref('lessons/' + slot).set(L);
+    }
+
+    function deleteLesson() {
+        if (!confirm('Delete this whole lesson and its questions? (Past answers from classes are kept.)')) return;
+        db.ref('lessons/' + curLessonSlot()).remove();
+        localStorage.removeItem(nextIdxKey(curLessonSlot()));
+    }
+
+    // Index of the question currently being edited (null = adding a new one)
+    let editingQ = null;
+
+    function addToLesson() {
+        const q = document.getElementById('qText').value.trim();
+        if (!q && !questionImage) { alert('Type a question or attach an image first.'); return; }
+        const slot = curLessonSlot();
+        const L = lessons[slot] || { name: '', questions: [] };
+        L.questions = L.questions || [];
+        const mins = parseInt(document.getElementById('qMinutes').value, 10);
+        const crit = parseInt(document.getElementById('qCritLimit').value, 10);
+        const entry = {
+            q: q || 'Analyze the image using S.W.I.F.T.',
+            image: questionImage || null,
+            mins: mins > 0 ? mins : null,
+            crit: isNaN(crit) ? 2 : crit
+        };
+
+        if (editingQ !== null) {
+            if (!L.questions[editingQ]) { cancelEditQ(); return; }
+            L.questions[editingQ] = entry; // overwrite in place, keep position
+        } else {
+            if (L.questions.length >= 10) { alert('This lesson already has 10 questions (the maximum).'); return; }
+            L.questions.push(entry);
+        }
+        if (!L.name) L.name = document.getElementById('lessonName').value.trim() || ('Lesson ' + slot);
+        db.ref('lessons/' + slot).set(L).then(() => {
+            clearComposeBox();
+        });
+    }
+
+    function clearComposeBox() {
+        document.getElementById('qText').value = '';
+        document.getElementById('qMinutes').value = '';
+        document.getElementById('qCritLimit').value = '2';
+        removeImage();
+        editingQ = null;
+        document.getElementById('addLessonBtn').textContent = '➕ Add to Lesson';
+        document.getElementById('cancelEditBtn').classList.add('hidden');
+    }
+
+    function editQ(i) {
+        const ql = ((lessons[curLessonSlot()] || {}).questions || [])[i];
+        if (!ql) return;
+        document.getElementById('qText').value = ql.q || '';
+        document.getElementById('qMinutes').value = ql.mins || '';
+        document.getElementById('qCritLimit').value = ql.crit != null ? ql.crit : 2;
+        if (ql.image) {
+            questionImage = ql.image;
+            document.getElementById('imgPreview').src = ql.image;
+            document.getElementById('imgPreviewWrap').classList.remove('hidden');
+        } else {
+            removeImage();
+        }
+        editingQ = i;
+        document.getElementById('addLessonBtn').textContent = `💾 Save changes to Q${i + 1}`;
+        document.getElementById('cancelEditBtn').classList.remove('hidden');
+        document.getElementById('qText').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function cancelEditQ() {
+        clearComposeBox();
+    }
+
+    function moveQ(i, dir) {
+        const slot = curLessonSlot(), L = lessons[slot];
+        if (!L || !L.questions) return;
+        const j = i + dir;
+        if (j < 0 || j >= L.questions.length) return;
+        [L.questions[i], L.questions[j]] = [L.questions[j], L.questions[i]];
+        selectedQ = null; // positions changed — clear to avoid a stale highlight
+        db.ref('lessons/' + slot).set(L);
+    }
+
+    function delQ(i) {
+        const slot = curLessonSlot(), L = lessons[slot];
+        if (!L || !L.questions) return;
+        L.questions.splice(i, 1);
+        selectedQ = null;
+        db.ref('lessons/' + slot).set(L);
+    }
+
+    // ---- Drag-and-drop reordering of lesson questions ----
+    let dragSrcIdx = null;
+
+    function lessonDragStart(e, i) {
+        dragSrcIdx = i;
+        e.dataTransfer.effectAllowed = 'move';
+        // Firefox needs data set for the drag to start
+        try { e.dataTransfer.setData('text/plain', String(i)); } catch (_) {}
+        e.currentTarget.classList.add('dragging');
+    }
+    function lessonDragOver(e, i) {
+        e.preventDefault(); // required to allow a drop
+        e.dataTransfer.dropEffect = 'move';
+        if (dragSrcIdx === null || i === dragSrcIdx) return;
+        e.currentTarget.classList.add('drag-over');
+    }
+    function lessonDragLeave(e) {
+        e.currentTarget.classList.remove('drag-over');
+    }
+    function lessonDrop(e, i) {
+        e.preventDefault();
+        e.currentTarget.classList.remove('drag-over');
+        if (dragSrcIdx === null || i === dragSrcIdx) return;
+        const slot = curLessonSlot(), L = lessons[slot];
+        if (!L || !L.questions) return;
+        const [moved] = L.questions.splice(dragSrcIdx, 1);
+        L.questions.splice(i, 0, moved); // insert at the drop position
+        dragSrcIdx = null;
+        selectedQ = null;
+        db.ref('lessons/' + slot).set(L);
+    }
+    function lessonDragEnd(e) {
+        dragSrcIdx = null;
+        document.querySelectorAll('.lesson-row').forEach(r =>
+            r.classList.remove('dragging', 'drag-over'));
+    }
+
+    function pushLessonQ(i) {
+        const slot = curLessonSlot();
+        const ql = ((lessons[slot] || {}).questions || [])[i];
+        if (!ql) return;
+        if (!confirmInterrupt()) return;
+        const roundId = 'r' + Date.now();
+        db.ref('session/current').set({
+            roundId: roundId,
+            question: ql.q,
+            image: ql.image || null,
+            phase: 'answer',
+            critLimit: ql.crit != null ? ql.crit : 2,
+            endsAt: ql.mins > 0 ? Date.now() + ql.mins * 60000 : null,
+            startedAt: firebase.database.ServerValue.TIMESTAMP
+        });
+        db.ref('rounds/' + roundId).set({
+            question: ql.q,
+            hadImage: !!ql.image,
+            startedAt: firebase.database.ServerValue.TIMESTAMP
+        });
+        localStorage.setItem(nextIdxKey(slot), String(i + 1));
+        renderLessonQs();
+    }
+
+    // Populate the slot dropdowns immediately so the UI works even
+    // before (or without) data arriving from the database.
+    refreshClassUI();
+    refreshLessonUI();
+
+    function renderLessonQs() {
+        const slot = curLessonSlot();
+        const qs = ((lessons[slot] || {}).questions) || [];
+        const next = parseInt(localStorage.getItem(nextIdxKey(slot)) || '0', 10);
+        const box = document.getElementById('lessonQs');
+        if (!qs.length) {
+            box.innerHTML = '<p class="muted">No questions in this lesson yet — add some with "➕ Add to Lesson" above.</p>';
+            return;
+        }
+        box.innerHTML = qs.map((ql, i) => `
+            <div class="lesson-row${i === next ? ' next' : ''}${i === selectedQ ? ' selected' : ''}" data-idx="${i}" draggable="true"
+                ondragstart="lessonDragStart(event,${i})" ondragover="lessonDragOver(event,${i})"
+                ondragleave="lessonDragLeave(event)" ondrop="lessonDrop(event,${i})" ondragend="lessonDragEnd(event)">
+                <span class="drag-handle" title="Drag to reorder">⠿</span>
+                <span style="flex:1; cursor:pointer;" onclick="selectQ(${i})">${i === selectedQ ? '🎯 ' : ''}${i < next ? '✅ ' : ''}<strong>Q${i + 1}.</strong>
+                    ${esc((ql.q || '').slice(0, 80))}${(ql.q || '').length > 80 ? '…' : ''}
+                    ${ql.image ? ' 🖼' : ''}${ql.mins ? ' ⏱' + ql.mins + 'm' : ''} 💬${ql.crit != null ? ql.crit : 2}</span>
+                <button class="spot-btn" style="margin:0;" onclick="editQ(${i})">✏️ Edit</button>
+                <button class="spot-btn" style="margin:0;" onclick="moveQ(${i}, -1)" ${i === 0 ? 'disabled' : ''}>↑</button>
+                <button class="spot-btn" style="margin:0;" onclick="moveQ(${i}, 1)" ${i === qs.length - 1 ? 'disabled' : ''}>↓</button>
+                <button class="spot-btn" style="margin:0; border-color:#f87171; color:#f87171;" onclick="delQ(${i})">✕</button>
+            </div>`).join('') +
+            `<button class="greenbtn" style="width:100%;" onclick="pushSelectedQ()" ${selectedQ === null ? 'disabled' : ''}>
+                🚀 ${selectedQ === null ? 'Tap a question above to select it' : 'Push Selected — Q' + (selectedQ + 1) + ' to Screen'}
+            </button>` +
+            (next < qs.length
+                ? `<button class="goldbtn" style="width:100%;" onclick="pushLessonQ(${next})">▶ Push Next in Sequence — Q${next + 1} of ${qs.length}</button>`
+                : `<p class="muted" style="text-align:center;">🏁 All ${qs.length} questions pushed in sequence.</p>`);
+    }
+
+    function selectQ(i) {
+        selectedQ = (selectedQ === i) ? null : i; // tap again to deselect
+        renderLessonQs();
+    }
+
+    function pushSelectedQ() {
+        if (selectedQ !== null) pushLessonQ(selectedQ);
+    }
+
+    function updateMissing() {
+        const wrap = document.getElementById('missingWrap');
+        if (!rosterNames.length || !currentRound) { wrap.classList.add('hidden'); return; }
+        const submitted = new Set(Object.values(latestPosts)
+            .map(p => (p.name || '').trim().toLowerCase()));
+        const missing = rosterNames.filter(n => !submitted.has(n.trim().toLowerCase()));
+        wrap.classList.remove('hidden');
+        document.getElementById('missingNames').textContent =
+            missing.length ? missing.join(', ') : 'nobody — full house! 🎉';
+    }
+
+    // ---- Storage housekeeping ----
+    function deleteOldRounds() {
+        if (!confirm('Delete all rounds (questions + answers + critiques) older than 30 days? Scores and the roster are kept. This cannot be undone.')) return;
+        const cutoff = Date.now() - 30 * 24 * 3600 * 1000;
+        Promise.all([
+            db.ref('rounds').once('value'),
+            db.ref('posts').once('value')
+        ]).then(([r, p]) => {
+            const updates = {};
+            let n = 0;
+            new Set([...Object.keys(r.val() || {}), ...Object.keys(p.val() || {})]).forEach(rid => {
+                const ts = parseInt(rid.slice(1), 10);
+                if (!isNaN(ts) && ts < cutoff) {
+                    updates['rounds/' + rid] = null;
+                    updates['posts/' + rid] = null;
+                    n++;
+                }
+            });
+            if (!n) { alert('No rounds older than 30 days — nothing to delete.'); return; }
+            db.ref().update(updates).then(() => alert(n + ' old round(s) deleted.'));
+        });
+    }
+
+    // ---- Question image (compressed, stored as data URL) ----
+    let questionImage = null;
+
+    document.getElementById('qImage').addEventListener('change', function() {
+        const file = this.files[0];
+        if (!file) return;
+        const img = new Image();
+        img.onload = () => {
+            const scale = Math.min(1, 1200 / Math.max(img.width, img.height));
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.round(img.width * scale);
+            canvas.height = Math.round(img.height * scale);
+            canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+            questionImage = canvas.toDataURL('image/jpeg', 0.72);
+            URL.revokeObjectURL(img.src);
+            if (questionImage.length > 900000) {
+                alert('That image is very large even after compression — try a smaller or simpler image.');
+                removeImage();
+                return;
+            }
+            document.getElementById('imgPreview').src = questionImage;
+            document.getElementById('imgPreviewWrap').classList.remove('hidden');
+        };
+        img.onerror = () => alert('Could not read that file as an image.');
+        img.src = URL.createObjectURL(file);
+    });
+
+    function removeImage() {
+        questionImage = null;
+        document.getElementById('qImage').value = '';
+        document.getElementById('imgPreviewWrap').classList.add('hidden');
+    }
+
+    // ---- Round lifecycle ----
+    // Warn before replacing a question while students are still answering it.
+    function confirmInterrupt() {
+        if (!sessionData || !sessionData.roundId) return true;
+        if ((sessionData.phase || 'answer') !== 'answer') return true; // past the answer phase
+        const submitted = Object.keys(latestPosts).length;
+        let msg;
+        if (rosterNames && rosterNames.length) {
+            const missing = rosterNames.length - submitted;
+            if (missing <= 0) return true; // whole class has locked in
+            msg = `${missing} of ${rosterNames.length} students haven't locked in yet (${submitted} submitted).\n\n`
+                + `Push the next question anyway? Anyone still typing will lose their current answer.`;
+        } else {
+            msg = `Only ${submitted} student(s) have locked in so far.\n\n`
+                + `Push the next question anyway? Anyone still typing will lose their current answer.`;
+        }
+        return confirm(msg);
+    }
+
+    function pushQuestion() {
+        const q = document.getElementById('qText').value.trim();
+        if (!q && !questionImage) { alert('Type a question or attach an image first.'); return; }
+        if (!confirmInterrupt()) return;
+        const mins = parseInt(document.getElementById('qMinutes').value, 10);
+
+        const roundId = 'r' + Date.now();
+        const questionText = q || 'Analyze the image using S.W.I.F.T.';
+
+        const critLimit = parseInt(document.getElementById('qCritLimit').value, 10);
+
+        db.ref('session/current').set({
+            roundId: roundId,
+            question: questionText,
+            image: questionImage,
+            phase: 'answer',
+            critLimit: isNaN(critLimit) ? 2 : critLimit,
+            endsAt: mins > 0 ? Date.now() + mins * 60000 : null,
+            startedAt: firebase.database.ServerValue.TIMESTAMP
+        });
+        // Permanent record so the CSV export can pair answers with questions
+        db.ref('rounds/' + roundId).set({
+            question: questionText,
+            hadImage: !!questionImage,
+            startedAt: firebase.database.ServerValue.TIMESTAMP
+        });
+    }
+
+    function openVoting() {
+        db.ref('session/current').update({ phase: 'vote' });
+    }
+
+    // Same question again: students improve their first attempt using the
+    // critiques they received. Budgets reset because it's a new round id.
+    function pushRedo() {
+        if (!sessionData || !sessionData.roundId) return;
+        if (!confirm('Push the SAME question again as a redo round? Students will see their first answer + feedback and improve it.')) return;
+        const mins = parseInt(document.getElementById('qMinutes').value, 10);
+        const roundId = 'r' + Date.now();
+        const origin = sessionData.redoOf || sessionData.roundId;
+
+        db.ref('session/current').set({
+            roundId: roundId,
+            question: sessionData.question,
+            image: sessionData.image || null,
+            phase: 'answer',
+            critLimit: sessionData.critLimit != null ? sessionData.critLimit : 2,
+            endsAt: mins > 0 ? Date.now() + mins * 60000 : null,
+            redoOf: origin,
+            startedAt: firebase.database.ServerValue.TIMESTAMP
+        });
+        db.ref('rounds/' + roundId).set({
+            question: '(Redo) ' + sessionData.question,
+            hadImage: !!sessionData.image,
+            redoOf: origin,
+            startedAt: firebase.database.ServerValue.TIMESTAMP
+        });
+    }
+
+    // ---- Spotlight: project one answer (anonymous) for class discussion ----
+    function toggleSpotlight(postId) {
+        const cur = sessionData && sessionData.spotlight;
+        db.ref('session/current/spotlight').set(cur === postId ? null : postId);
+    }
+
+    function clearBoard() {
+        if (!confirm('End the round? Student screens go back to "waiting". (Scores are kept.)')) return;
+        db.ref('session/current').remove();
+        document.getElementById('validatePanel').classList.add('hidden');
+    }
+
+    function resetScores() {
+        const who = activeClass ? `"${activeClass.name}"` : 'the shared scoreboard';
+        if (!confirm(`Reset all points to zero for ${who}?`)) return;
+        db.ref(scoresPath()).remove();
+    }
+
+    // ---- Points (each class has its own scoreboard) ----
+    function scoreKey(name) {
+        return (name || 'anonymous').trim().toLowerCase().replace(/[.#$\[\]\/]/g, '') || 'anonymous';
+    }
+    function scoresPath() {
+        return 'scores/' + (activeClass && activeClass.slot ? 'c' + activeClass.slot : 'default');
+    }
+    function addPoints(name, pts) {
+        db.ref(scoresPath() + '/' + scoreKey(name)).transaction(cur => ({
+            name: name,
+            points: ((cur && cur.points) || 0) + pts
+        }));
+    }
+
+    let scoresRef = null;
+    function resubscribeScores() {
+        if (scoresRef) scoresRef.off();
+        scoresRef = db.ref(scoresPath());
+        scoresRef.on('value', renderScores);
+    }
+
+    // ---- Validation panel + podium ----
+    function postOptions(selectedId) {
+        const sorted = Object.entries(latestPosts)
+            .map(([id, p]) => ({ id, ...p }))
+            .sort((a, b) => (b.upvotes || 0) - (a.upvotes || 0));
+        return sorted.map(p =>
+            `<option value="${p.id}" ${p.id === selectedId ? 'selected' : ''}>` +
+            `${esc(p.name)} — 👍 ${p.upvotes || 0}</option>`).join('');
+    }
+
+    function updateSlotPreview(n) {
+        const id = document.getElementById('slotSel' + n).value;
+        const post = latestPosts[id];
+        const prev = document.getElementById('slotPrev' + n);
+        if (!post) { prev.innerHTML = ''; return; }
+        const critCount = Object.keys(post.critiques || {}).length;
+        prev.innerHTML = `
+            <div class="pv-meta">👍 ${post.upvotes || 0} votes · 💬 ${critCount} critiques</div>
+            ${renderDims(post)}`;
+    }
+
+    function showValidation() {
+        const sorted = Object.entries(latestPosts)
+            .map(([id, p]) => ({ id, ...p }))
+            .sort((a, b) => (b.upvotes || 0) - (a.upvotes || 0));
+        if (sorted.length < 3) { alert('Need at least 3 submissions to build a podium.'); return; }
+        document.getElementById('slotSel1').innerHTML = postOptions(sorted[0].id);
+        document.getElementById('slotSel2').innerHTML = postOptions(sorted[1].id);
+        document.getElementById('slotSel3').innerHTML = postOptions(sorted[2].id);
+        [1, 2, 3].forEach(updateSlotPreview);
+        document.getElementById('validatePanel').classList.remove('hidden');
+        document.getElementById('validatePanel').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function confirmPodium() {
+        const ids = ['slotSel1', 'slotSel2', 'slotSel3']
+            .map(id => document.getElementById(id).value);
+        if (new Set(ids).size !== 3) { alert('The three podium places must be three different students.'); return; }
+
+        db.ref('rounds/' + currentRound + '/awarded').once('value').then(snap => {
+            if (snap.val()) { alert('Points were already awarded for this round.'); return; }
+
+            const podium = {
+                first:  { id: ids[0], name: latestPosts[ids[0]].name },
+                second: { id: ids[1], name: latestPosts[ids[1]].name },
+                third:  { id: ids[2], name: latestPosts[ids[2]].name }
+            };
+            addPoints(podium.first.name, POINTS.first);
+            addPoints(podium.second.name, POINTS.second);
+            addPoints(podium.third.name, POINTS.third);
+
+            db.ref('rounds/' + currentRound + '/awarded').set(true);
+            db.ref('rounds/' + currentRound + '/podium').set(podium); // permanent, for review.html
+            db.ref('session/current').update({ phase: 'podium', podium: podium });
+
+            document.getElementById('validatePanel').classList.add('hidden');
+            runPodiumReveal(podium);
+        });
+    }
+
+    function runPodiumReveal(podium) {
+        document.getElementById('pslot1').querySelector('.pname').textContent = podium.first.name;
+        document.getElementById('pslot2').querySelector('.pname').textContent = podium.second.name;
+        document.getElementById('pslot3').querySelector('.pname').textContent = podium.third.name;
+
+        [1, 2, 3].forEach(n =>
+            document.getElementById('pslot' + n).classList.remove('revealed'));
+        document.getElementById('podiumOverlay').classList.remove('hidden');
+
+        // Staged: 3rd, then 2nd, then 1st + confetti
+        setTimeout(() => document.getElementById('pslot3').classList.add('revealed'), 600);
+        setTimeout(() => document.getElementById('pslot2').classList.add('revealed'), 1900);
+        setTimeout(() => {
+            document.getElementById('pslot1').classList.add('revealed');
+            dropConfetti();
+        }, 3200);
+    }
+
+    function replayPodium() {
+        if (sessionData && sessionData.podium) runPodiumReveal(sessionData.podium);
+    }
+
+    function closePodium() {
+        document.getElementById('podiumOverlay').classList.add('hidden');
+    }
+
+    function dropConfetti() {
+        const emojis = ['🎉', '✨', '🎊', '⭐', '🏆'];
+        for (let i = 0; i < 40; i++) {
+            const c = document.createElement('span');
+            c.className = 'confetti';
+            c.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+            c.style.left = Math.random() * 100 + 'vw';
+            c.style.animationDuration = (2.5 + Math.random() * 2) + 's';
+            c.style.animationDelay = (Math.random() * 0.8) + 's';
+            document.body.appendChild(c);
+            setTimeout(() => c.remove(), 6000);
+        }
+    }
+
+    // ---- Star a critique: +1 point to its author, one-way ----
+    function starCritique(postId, critId, by) {
+        db.ref(`posts/${currentRound}/${postId}/critiques/${critId}/starred`).set(true);
+        addPoints(by, POINTS.star);
+    }
+
+    // ---- Live session / posts / scores ----
+    const PHASE_LABELS = {
+        answer: '✍️ Phase 1: Answering',
+        vote: '🗳 Phase 2: Voting & Critique',
+        podium: '🏆 Phase 3: Podium shown'
+    };
+
+    db.ref('session/current').on('value', snap => {
+        sessionData = snap.val();
+        const phase = sessionData ? (sessionData.phase || 'answer') : null;
+
+        document.getElementById('phasePill').textContent =
+            phase ? 'Phase: ' + PHASE_LABELS[phase] : 'Phase: — no active question —';
+        document.getElementById('openVotingBtn').disabled = phase !== 'answer';
+        document.getElementById('podiumBtn').disabled = phase !== 'vote';
+        document.getElementById('redoBtn').disabled = !(phase === 'vote' || phase === 'podium');
+        document.getElementById('replayBtn').classList.toggle('hidden',
+            !(sessionData && sessionData.podium));
+
+        if (!sessionData || !sessionData.roundId) {
+            currentRound = null;
+            if (postsRef) { postsRef.off(); postsRef = null; }
+            document.getElementById('liveQuestion').textContent = 'No active question';
+            document.getElementById('liveImageWrap').classList.add('hidden');
+            document.getElementById('feedContainer').innerHTML =
+                '<p class="muted">Responses will appear here as students submit.</p>';
+            document.getElementById('countSubmitted').textContent = '0';
+            document.getElementById('countCritiques').textContent = '0';
+            startTimer(null);
+            return;
+        }
+
+        document.getElementById('liveQuestion').textContent = sessionData.question;
+        if (sessionData.image) {
+            document.getElementById('liveImage').src = sessionData.image;
+            document.getElementById('liveImageWrap').classList.remove('hidden');
+        } else {
+            document.getElementById('liveImageWrap').classList.add('hidden');
+        }
+        startTimer(sessionData.endsAt);
+
+        if (sessionData.roundId !== currentRound) {
+            currentRound = sessionData.roundId;
+            document.getElementById('validatePanel').classList.add('hidden');
+            if (postsRef) postsRef.off();
+            postsRef = db.ref('posts/' + currentRound);
+            postsRef.on('value', s => {
+                latestPosts = s.val() || {};
+                renderFeed();
+            });
+        } else {
+            renderFeed(); // refresh spotlight on/off state on the buttons
+        }
+    });
+
+    function renderScores(snap) {
+        const scores = Object.values(snap.val() || {})
+            .sort((a, b) => b.points - a.points);
+        const body = document.getElementById('scoreBody');
+        if (!scores.length) {
+            body.innerHTML = '<tr><td colspan="3" class="muted">No points awarded yet.</td></tr>';
+            return;
+        }
+        const medals = ['🥇', '🥈', '🥉'];
+        body.innerHTML = scores.map((s, i) =>
+            `<tr><td>${medals[i] || (i + 1)}</td><td>${esc(s.name)}</td><td class="pts">${s.points}</td></tr>`
+        ).join('');
+    }
+
+    function startTimer(endsAt) {
+        clearInterval(timerInterval);
+        const el = document.getElementById('timerBig');
+        if (!endsAt) { el.textContent = '–'; el.classList.remove('urgent'); return; }
+        function tick() {
+            const left = Math.max(0, Math.round((endsAt - Date.now()) / 1000));
+            const m = Math.floor(left / 60), s = String(left % 60).padStart(2, '0');
+            el.textContent = `${m}:${s}`;
+            el.classList.toggle('urgent', left <= 60);
+            if (left <= 0) clearInterval(timerInterval);
+        }
+        tick();
+        timerInterval = setInterval(tick, 1000);
+    }
+
+    function renderFeed() {
+        const posts = Object.entries(latestPosts)
+            .map(([id, p]) => ({ id, ...p }))
+            .sort((a, b) => (b.upvotes || 0) - (a.upvotes || 0));
+
+        document.getElementById('countSubmitted').textContent = posts.length;
+        document.getElementById('countCritiques').textContent =
+            posts.reduce((n, p) => n + Object.keys(p.critiques || {}).length, 0);
+        updateMissing();
+        updateSelfcheckTally(posts);
+
+        const feed = document.getElementById('feedContainer');
+        feed.innerHTML = '';
+        if (!posts.length) {
+            feed.innerHTML = '<p class="muted">Responses will appear here as students submit.</p>';
+            return;
+        }
+
+        const topVotes = posts[0].upvotes || 0;
+
+        posts.forEach(post => {
+            const isTop = topVotes > 0 && (post.upvotes || 0) === topVotes;
+            const critiques = Object.entries(post.critiques || {});
+            const el = document.createElement('div');
+            el.className = 'card post' + (isTop ? ' top' : '');
+            const spotOn = sessionData && sessionData.spotlight === post.id;
+            el.innerHTML = `
+                <div class="post-head">
+                    <span class="post-author">${isTop ? '👑 ' : ''}${esc(post.name)}</span>
+                    <span>
+                        <button class="spot-btn${spotOn ? ' on' : ''}" onclick="toggleSpotlight('${post.id}')">
+                            ${spotOn ? '📺 On screen — stop' : '📺 Spotlight'}
+                        </button>
+                        <span class="votes">👍 ${post.upvotes || 0}</span>
+                    </span>
+                </div>
+                ${renderDims(post)}
+                ${critiques.length ? `<div class="critiques-list">
+                    ${critiques.map(([cid, c]) => `
+                        <div class="crit-row">
+                            <button class="star-btn" ${c.starred ? 'disabled' : ''}
+                                onclick="starCritique('${post.id}', '${cid}', '${esc(c.by).replace(/'/g, "\\'")}')">
+                                ${c.starred ? '⭐ +1 given' : '⭐ +1'}
+                            </button>
+                            <span><em>${esc(c.by)}:</em>
+                                <strong>A:</strong> ${esc(c.affirm)} ·
+                                <strong>C:</strong> ${esc(c.clarify)} ·
+                                <strong>S:</strong> ${esc(c.suggest)}</span>
+                        </div>
+                    `).join('')}
+                </div>` : ''}
+            `;
+            feed.appendChild(el);
+        });
+    }
+
+    // ---- Self-check tally: where does the class think it's weak? ----
+    function updateSelfcheckTally(posts) {
+        const card = document.getElementById('selfcheckCard');
+        const tally = {};
+        DIMS.forEach(([k]) => tally[k] = { ok: 0, fix: 0 });
+        let any = false;
+        posts.forEach(p => {
+            if (!p.selfcheck) return;
+            DIMS.forEach(([k]) => {
+                if (p.selfcheck[k] === 'ok') { tally[k].ok++; any = true; }
+                if (p.selfcheck[k] === 'fix') { tally[k].fix++; any = true; }
+            });
+        });
+        if (!any) { card.classList.add('hidden'); return; }
+        card.classList.remove('hidden');
+        document.getElementById('selfcheckRows').innerHTML = DIMS.map(([k, label]) => {
+            const t = tally[k];
+            const weak = t.fix > t.ok;
+            return `<div style="display:flex; justify-content:space-between; padding:8px 12px;
+                border-radius:8px; margin-bottom:6px;
+                background:${weak ? '#3b1212' : 'var(--card-2)'};
+                border:1px solid ${weak ? '#b91c1c' : 'var(--border)'};">
+                <strong>${label}</strong>
+                <span>✅ ${t.ok} &nbsp; 🔧 ${t.fix}${weak ? ' &nbsp;⚠️ class-wide gap' : ''}</span>
+            </div>`;
+        }).join('');
+    }
+
+    // ---- CSV export: every round + final scores ----
+    function exportCSV() {
+        Promise.all([
+            db.ref('rounds').once('value'),
+            db.ref('posts').once('value'),
+            db.ref(scoresPath()).once('value')
+        ]).then(([rSnap, pSnap, sSnap]) => {
+            const rounds = rSnap.val() || {};
+            const allPosts = pSnap.val() || {};
+            const scores = Object.values(sSnap.val() || {}).sort((a, b) => b.points - a.points);
+            const roundIds = Object.keys(allPosts).sort();
+            if (!roundIds.length) { alert('No responses in the database yet.'); return; }
+
+            const cell = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+            const rows = [[
+                'Question #', 'Date', 'Question', 'Student',
+                'S — Number of Setups', 'W — Command Word', 'I — Idea of Science',
+                'F — Facts / Data', 'T — Tally the Marks',
+                'Upvotes', 'Critiques received'
+            ].map(cell).join(',')];
+
+            roundIds.forEach((rid, idx) => {
+                const meta = rounds[rid] || {};
+                const ts = meta.startedAt || parseInt(rid.slice(1), 10);
+                const date = isNaN(ts) ? '' : new Date(ts).toLocaleString();
+                Object.values(allPosts[rid] || {}).forEach(p => {
+                    const crits = Object.values(p.critiques || {})
+                        .map(c => `${c.starred ? '⭐ ' : ''}${c.by} — Affirm: ${c.affirm} / Clarify: ${c.clarify} / Suggest: ${c.suggest}`)
+                        .join('  ||  ');
+                    rows.push([
+                        idx + 1, date, meta.question || '(question not recorded)',
+                        p.name, p.s, p.w, p.i, p.f, p.t,
+                        p.upvotes || 0, crits
+                    ].map(cell).join(','));
+                });
+            });
+
+            if (scores.length) {
+                rows.push('');
+                rows.push([cell('SESSION LEADERBOARD'), cell('Points')].join(','));
+                scores.forEach(s => rows.push([cell(s.name), cell(s.points)].join(',')));
+            }
+
+            const blob = new Blob(['﻿' + rows.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'swift-responses-' + new Date().toISOString().slice(0, 10) + '.csv';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(a.href);
+        }).catch(err => {
+            alert('Export failed — check the internet connection. (' + err.message + ')');
+        });
+    }
+</script>
+
+</body>
+</html>

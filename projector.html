@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S.W.I.F.T. Arena — Projector</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --border: #334155;
+            --text: #e2e8f0;
+            --muted: #94a3b8;
+            --primary: #38bdf8;
+            --gold: #fbbf24;
+            --green: #34d399;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 30px;
+            overflow: hidden;
+        }
+        .container { max-width: 1100px; margin: 0 auto; text-align: center; }
+        .hidden { display: none !important; }
+        h1 { font-size: 56px; letter-spacing: 2px; margin: 10px 0 30px; }
+        h1 .spark { color: var(--gold); }
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 30px;
+            margin-bottom: 20px;
+        }
+        .question-banner {
+            background: linear-gradient(135deg, #1e293b, #312e81);
+            border: 1px solid #4338ca;
+            padding: 28px;
+            border-radius: 18px;
+            font-size: 38px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+        .question-image img { max-width: 100%; max-height: 45vh; border-radius: 12px; }
+        #timerBig { font-size: 110px; font-weight: bold; color: var(--primary); line-height: 1; }
+        #timerBig.urgent { color: #f87171; animation: blink 1s infinite; }
+        @keyframes blink { 50% { opacity: 0.35; } }
+        .statrow { display: flex; justify-content: center; gap: 60px; flex-wrap: wrap; }
+        .stat .num { font-size: 90px; font-weight: bold; color: var(--green); line-height: 1; }
+        .stat .lbl { font-size: 20px; color: var(--muted); text-transform: uppercase; letter-spacing: 2px; }
+        .bigemoji { font-size: 90px; animation: bob 2s ease-in-out infinite; display: inline-block; }
+        @keyframes bob { 50% { transform: translateY(-10px); } }
+        .sub { color: var(--muted); font-size: 24px; }
+        .qr img { background: white; padding: 12px; border-radius: 14px; }
+        .url { font-size: 22px; color: var(--primary); margin-top: 10px; }
+        .votebanner { font-size: 48px; font-weight: bold; color: var(--gold); margin: 20px 0; }
+
+        /* Podium */
+        #podiumScreen h2 { font-size: 54px; color: var(--gold); margin: 0 0 30px; }
+        .podium-row { display: flex; align-items: flex-end; justify-content: center; gap: 24px; }
+        .podium-slot {
+            width: 28%;
+            opacity: 0;
+            transform: translateY(60px);
+            transition: opacity 0.7s ease, transform 0.7s ease;
+        }
+        .podium-slot.revealed { opacity: 1; transform: translateY(0); }
+        .podium-slot .medal { font-size: 70px; }
+        .podium-slot .pname { font-size: 36px; font-weight: bold; margin: 8px 0; }
+        .podium-slot .ppts { font-size: 26px; color: var(--gold); font-weight: bold; }
+        .podium-slot .bar { border-radius: 12px 12px 0 0; margin-top: 14px; }
+        .bar1 { height: 200px; background: linear-gradient(180deg, #fbbf24, #b45309); }
+        .bar2 { height: 135px; background: linear-gradient(180deg, #cbd5e1, #64748b); }
+        .bar3 { height: 90px;  background: linear-gradient(180deg, #fb923c, #9a3412); }
+        .confetti { position: fixed; top: -40px; font-size: 30px; animation: fall linear forwards; z-index: 10; }
+        @keyframes fall { to { transform: translateY(110vh) rotate(720deg); } }
+
+        /* Spotlight */
+        :root {
+            --dimS: #38bdf8; --dimW: #f472b6; --dimI: #a78bfa;
+            --dimF: #34d399; --dimT: #fb923c;
+        }
+        .spot-title { font-size: 40px; font-weight: bold; color: var(--primary); margin-bottom: 18px; }
+        .spot-card { text-align: left; font-size: 26px; }
+        .dimension {
+            margin-bottom: 16px;
+            padding-left: 16px;
+            border-left: 6px solid var(--border);
+        }
+        .dimension.d-s { border-left-color: var(--dimS); } .d-s b { color: var(--dimS); }
+        .dimension.d-w { border-left-color: var(--dimW); } .d-w b { color: var(--dimW); }
+        .dimension.d-i { border-left-color: var(--dimI); } .d-i b { color: var(--dimI); }
+        .dimension.d-f { border-left-color: var(--dimF); } .d-f b { color: var(--dimF); }
+        .dimension.d-t { border-left-color: var(--dimT); } .d-t b { color: var(--dimT); }
+        .dimension b { margin-right: 8px; }
+        .spot-hint { color: var(--muted); font-size: 22px; margin-top: 14px; }
+
+        table { width: 70%; margin: 26px auto 0; border-collapse: collapse; font-size: 26px; }
+        th, td { padding: 10px 16px; border-bottom: 1px solid var(--border); text-align: left; }
+        th { color: var(--muted); font-size: 16px; text-transform: uppercase; }
+        td.pts { font-weight: bold; color: var(--gold); }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>S.W.I.F.T. <span class="spark">Arena</span></h1>
+
+    <!-- Waiting -->
+    <div id="scrWait">
+        <div class="card qr">
+            <div class="bigemoji">📱</div>
+            <p class="sub">Scan to join</p>
+            <img id="qrImg" width="280" height="280" alt="QR code">
+            <div class="url" id="studentUrl"></div>
+        </div>
+    </div>
+
+    <!-- Answering -->
+    <div id="scrAnswer" class="hidden">
+        <div class="question-banner" id="qTextA"></div>
+        <div class="card hidden question-image" id="qImgWrapA"><img id="qImgA" alt=""></div>
+        <div class="card">
+            <div class="statrow">
+                <div class="stat"><div class="num" id="answerCount">0</div><div class="lbl">Locked in</div></div>
+                <div class="stat"><div id="timerBig">–</div><div class="lbl">Time left</div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Voting (anonymity preserved: no names, no rankings) -->
+    <div id="scrVote" class="hidden">
+        <div class="question-banner" id="qTextV"></div>
+        <div class="votebanner">🗳 VOTING & CRITIQUE OPEN</div>
+        <div class="card">
+            <div class="statrow">
+                <div class="stat"><div class="num" id="voteAnswers">0</div><div class="lbl">Answers</div></div>
+                <div class="stat"><div class="num" id="voteCount">0</div><div class="lbl">Votes cast</div></div>
+                <div class="stat"><div class="num" id="critCount">0</div><div class="lbl">Critiques</div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Spotlight: one anonymous answer for class discussion -->
+    <div id="scrSpot" class="hidden">
+        <div class="spot-title" id="spotTitle">📺 Answer Spotlight</div>
+        <div class="card spot-card" id="spotDims"></div>
+        <div class="spot-hint">What would you <b style="color:var(--green);">Affirm</b>?
+            What needs <b style="color:var(--primary);">Clarifying</b>?
+            What would you <b style="color:var(--gold);">Suggest</b>?</div>
+    </div>
+
+    <!-- Podium + leaderboard -->
+    <div id="podiumScreen" class="hidden">
+        <h2>🏆 Round Podium</h2>
+        <div class="podium-row">
+            <div class="podium-slot" id="pslot2">
+                <div class="medal">🥈</div><div class="pname"></div><div class="ppts">+3 pts</div><div class="bar bar2"></div>
+            </div>
+            <div class="podium-slot" id="pslot1">
+                <div class="medal">🥇</div><div class="pname"></div><div class="ppts">+5 pts</div><div class="bar bar1"></div>
+            </div>
+            <div class="podium-slot" id="pslot3">
+                <div class="medal">🥉</div><div class="pname"></div><div class="ppts">+2 pts</div><div class="bar bar3"></div>
+            </div>
+        </div>
+        <table>
+            <thead><tr><th>#</th><th>Session standings</th><th>Points</th></tr></thead>
+            <tbody id="scoreBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    let session = null;
+    let currentRound = null;
+    let postsRef = null;
+    let latestPosts = {};
+    let timerInterval = null;
+    let podiumShownFor = null;   // round whose podium reveal has already played
+
+    function esc(str) {
+        const div = document.createElement('div');
+        div.textContent = str || '';
+        return div.innerHTML;
+    }
+
+    const studentUrl = window.location.href.replace(/projector\.html.*$/, '');
+    document.getElementById('studentUrl').textContent = studentUrl;
+    document.getElementById('qrImg').src =
+        'https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=' +
+        encodeURIComponent(studentUrl);
+
+    const DIMS = [
+        ['s', 'S — Number of Setups'],
+        ['w', 'W — Command Word'],
+        ['i', 'I — Idea of Science'],
+        ['f', 'F — Facts / Data'],
+        ['t', 'T — Tally the Marks']
+    ];
+    function renderDims(post) {
+        return DIMS.map(([k, label]) =>
+            `<div class="dimension d-${k}"><b>${label}:</b> ${esc(post[k])}</div>`
+        ).join('');
+    }
+
+    function show(id) {
+        ['scrWait', 'scrAnswer', 'scrVote', 'scrSpot', 'podiumScreen'].forEach(s =>
+            document.getElementById(s).classList.toggle('hidden', s !== id));
+    }
+
+    db.ref('session/current').on('value', snap => {
+        session = snap.val();
+        render();
+    });
+
+    // Follow the active class's scoreboard
+    let scoresRef = null;
+    db.ref('settings/activeClass').on('value', snap => {
+        const ac = snap.val();
+        const path = 'scores/' + (ac && ac.slot ? 'c' + ac.slot : 'default');
+        if (scoresRef) scoresRef.off();
+        scoresRef = db.ref(path);
+        scoresRef.on('value', s => {
+            const scores = Object.values(s.val() || {}).sort((a, b) => b.points - a.points);
+            const medals = ['🥇', '🥈', '🥉'];
+            document.getElementById('scoreBody').innerHTML = scores.map((sc, i) =>
+                `<tr><td>${medals[i] || (i + 1)}</td><td>${esc(sc.name)}</td><td class="pts">${sc.points}</td></tr>`
+            ).join('');
+        });
+    });
+
+    function render() {
+        if (!session || !session.roundId) {
+            currentRound = null;
+            if (postsRef) { postsRef.off(); postsRef = null; }
+            show('scrWait');
+            return;
+        }
+
+        if (session.roundId !== currentRound) {
+            currentRound = session.roundId;
+            if (postsRef) postsRef.off();
+            postsRef = db.ref('posts/' + currentRound);
+            postsRef.on('value', s => {
+                latestPosts = s.val() || {};
+                render();
+            });
+        }
+
+        document.getElementById('qTextA').textContent = session.question;
+        document.getElementById('qTextV').textContent = session.question;
+        if (session.image) {
+            document.getElementById('qImgA').src = session.image;
+            document.getElementById('qImgWrapA').classList.remove('hidden');
+        } else {
+            document.getElementById('qImgWrapA').classList.add('hidden');
+        }
+        startTimer(session.endsAt);
+        updateStats();
+
+        // Spotlight overrides whatever phase screen would show (stays anonymous)
+        if (session.spotlight && latestPosts[session.spotlight]) {
+            const post = latestPosts[session.spotlight];
+            const order = Object.entries(latestPosts)
+                .map(([id, p]) => ({ id, t: p.submittedAt || 0 }))
+                .sort((a, b) => a.t - b.t);
+            const num = order.findIndex(p => p.id === session.spotlight) + 1;
+            document.getElementById('spotTitle').textContent = `📺 Spotlight — Answer #${num}`;
+            document.getElementById('spotDims').innerHTML = renderDims(post);
+            show('scrSpot');
+            return;
+        }
+
+        const phase = session.phase || 'answer';
+        if (phase === 'answer') show('scrAnswer');
+        else if (phase === 'vote') show('scrVote');
+        else if (phase === 'podium' && session.podium) {
+            show('podiumScreen');
+            if (podiumShownFor !== currentRound) {
+                podiumShownFor = currentRound;
+                runPodiumReveal(session.podium);
+            }
+        }
+    }
+
+    function updateStats() {
+        const posts = Object.values(latestPosts);
+        document.getElementById('answerCount').textContent = posts.length;
+        document.getElementById('voteAnswers').textContent = posts.length;
+        document.getElementById('voteCount').textContent =
+            posts.reduce((n, p) => n + (p.upvotes || 0), 0);
+        document.getElementById('critCount').textContent =
+            posts.reduce((n, p) => n + Object.keys(p.critiques || {}).length, 0);
+    }
+
+    function startTimer(endsAt) {
+        clearInterval(timerInterval);
+        const el = document.getElementById('timerBig');
+        if (!endsAt) { el.textContent = '–'; el.classList.remove('urgent'); return; }
+        function tick() {
+            const left = Math.max(0, Math.round((endsAt - Date.now()) / 1000));
+            const m = Math.floor(left / 60), s = String(left % 60).padStart(2, '0');
+            el.textContent = `${m}:${s}`;
+            el.classList.toggle('urgent', left <= 60);
+            if (left <= 0) clearInterval(timerInterval);
+        }
+        tick();
+        timerInterval = setInterval(tick, 1000);
+    }
+
+    function runPodiumReveal(podium) {
+        document.getElementById('pslot1').querySelector('.pname').textContent = podium.first.name;
+        document.getElementById('pslot2').querySelector('.pname').textContent = podium.second.name;
+        document.getElementById('pslot3').querySelector('.pname').textContent = podium.third.name;
+        [1, 2, 3].forEach(n =>
+            document.getElementById('pslot' + n).classList.remove('revealed'));
+        setTimeout(() => document.getElementById('pslot3').classList.add('revealed'), 600);
+        setTimeout(() => document.getElementById('pslot2').classList.add('revealed'), 1900);
+        setTimeout(() => {
+            document.getElementById('pslot1').classList.add('revealed');
+            dropConfetti();
+        }, 3200);
+    }
+
+    function dropConfetti() {
+        const emojis = ['🎉', '✨', '🎊', '⭐', '🏆'];
+        for (let i = 0; i < 50; i++) {
+            const c = document.createElement('span');
+            c.className = 'confetti';
+            c.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+            c.style.left = Math.random() * 100 + 'vw';
+            c.style.animationDuration = (2.5 + Math.random() * 2) + 's';
+            c.style.animationDelay = (Math.random() * 0.8) + 's';
+            document.body.appendChild(c);
+            setTimeout(() => c.remove(), 6000);
+        }
+    }
+</script>
+
+</body>
+</html>

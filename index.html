@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S.W.I.F.T. Arena</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --card-2: #243349;
+            --border: #334155;
+            --text: #e2e8f0;
+            --muted: #94a3b8;
+            --primary: #38bdf8;
+            --gold: #fbbf24;
+            --green: #34d399;
+            --dimS: #38bdf8;
+            --dimW: #f472b6;
+            --dimI: #a78bfa;
+            --dimF: #34d399;
+            --dimT: #fb923c;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+        }
+        .container { max-width: 800px; margin: 0 auto; }
+        .hidden { display: none !important; }
+        h1, h2 { text-align: center; letter-spacing: 1px; }
+        h1 .spark { color: var(--gold); }
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 6px 16px -6px rgba(0, 0, 0, 0.5);
+        }
+        label {
+            font-weight: bold;
+            display: inline-block;
+            margin: 16px 0 6px;
+            padding: 3px 10px;
+            border-radius: 999px;
+            font-size: 14px;
+        }
+        .lbl-name { background: #475569; color: white; }
+        .lbl-s { background: var(--dimS); color: #082f49; }
+        .lbl-w { background: var(--dimW); color: #500724; }
+        .lbl-i { background: var(--dimI); color: #2e1065; }
+        .lbl-f { background: var(--dimF); color: #022c22; }
+        .lbl-t { background: var(--dimT); color: #431407; }
+        textarea, input[type=text], select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            font-size: 16px; /* prevents iPad auto-zoom */
+            background: var(--card-2);
+            color: var(--text);
+            resize: vertical;
+        }
+        textarea::placeholder, input::placeholder { color: var(--muted); }
+        textarea { height: 76px; }
+        #dimS { border-left: 5px solid var(--dimS); }
+        #dimW { border-left: 5px solid var(--dimW); }
+        #dimI { border-left: 5px solid var(--dimI); }
+        #dimF { border-left: 5px solid var(--dimF); }
+        #dimT { border-left: 5px solid var(--dimT); }
+        button {
+            background: linear-gradient(135deg, #38bdf8, #2563eb);
+            color: white;
+            border: none;
+            padding: 15px 20px;
+            font-size: 17px;
+            font-weight: bold;
+            border-radius: 10px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 20px;
+            touch-action: manipulation;
+            transition: transform 0.08s ease;
+        }
+        button:active { transform: scale(0.96); }
+        button:disabled {
+            background: #475569;
+            color: #94a3b8;
+        }
+        .question-banner {
+            background: linear-gradient(135deg, #1e293b, #312e81);
+            border: 1px solid #4338ca;
+            color: white;
+            padding: 16px 20px;
+            border-radius: 14px;
+            font-size: 18px;
+            margin-bottom: 16px;
+            text-align: center;
+        }
+        /* Model comparison (podium phase) */
+        .cmp-dim {
+            background: var(--card-2);
+            border-radius: 10px;
+            padding: 12px;
+            margin-top: 12px;
+        }
+        .cmp-label { font-weight: bold; margin-bottom: 8px; }
+        .cmp-label.d-s { color: var(--dimS); } .cmp-label.d-w { color: var(--dimW); }
+        .cmp-label.d-i { color: var(--dimI); } .cmp-label.d-f { color: var(--dimF); }
+        .cmp-label.d-t { color: var(--dimT); }
+        .cmp-row { margin-bottom: 6px; font-size: 15px; }
+        .cmp-tag {
+            display: inline-block;
+            font-size: 11px;
+            font-weight: bold;
+            padding: 2px 8px;
+            border-radius: 999px;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        .cmp-tag.model { background: var(--gold); color: #451a03; }
+        .cmp-tag.mine { background: var(--green); color: #022c22; }
+        .cmp-btns { margin-top: 8px; display: flex; gap: 8px; }
+        .cmp-btn {
+            width: auto;
+            flex: 1;
+            margin: 0;
+            padding: 9px 10px;
+            font-size: 14px;
+            background: #475569;
+        }
+        .cmp-btn.ok.sel { background: linear-gradient(135deg, #34d399, #059669); }
+        .cmp-btn.fix.sel { background: linear-gradient(135deg, #fb923c, #c2410c); color: #431407; }
+        .redo-banner {
+            background: linear-gradient(135deg, #fbbf24, #d97706);
+            color: #451a03;
+            font-weight: bold;
+            text-align: center;
+            padding: 12px 16px;
+            border-radius: 12px;
+            margin-bottom: 16px;
+            font-size: 17px;
+        }
+        .question-image { text-align: center; padding: 10px; }
+        .question-image img { max-width: 100%; max-height: 350px; border-radius: 10px; }
+        #timerBar {
+            text-align: center;
+            font-weight: bold;
+            font-size: 22px;
+            color: var(--primary);
+            margin-bottom: 10px;
+        }
+        #timerBar.urgent { color: #f87171; animation: blink 1s infinite; }
+        @keyframes blink { 50% { opacity: 0.4; } }
+
+        /* Waiting + locked screens */
+        .bigscreen {
+            text-align: center;
+            padding: 50px 20px;
+        }
+        .bigscreen .emoji { font-size: 64px; animation: bob 2s ease-in-out infinite; display: inline-block; }
+        @keyframes bob { 50% { transform: translateY(-8px); } }
+        .bigscreen .headline { font-size: 24px; font-weight: bold; margin: 16px 0 8px; }
+        .bigscreen .sub { color: var(--muted); font-size: 16px; }
+        .bigcount { font-size: 56px; font-weight: bold; color: var(--green); }
+
+        /* Feed */
+        .feedbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            font-size: 15px;
+            color: var(--muted);
+        }
+        .votechip {
+            background: var(--gold);
+            color: #451a03;
+            font-weight: bold;
+            padding: 4px 12px;
+            border-radius: 999px;
+        }
+        .votechip.empty { background: #475569; color: #cbd5e1; }
+        .post {
+            border-left: 5px solid var(--primary);
+            padding: 12px 16px;
+            margin-bottom: 10px;
+        }
+        .post.mine { border-left-color: var(--green); }
+        .post.model {
+            border: 2px solid var(--gold);
+            border-left: 5px solid var(--gold);
+            background: #2b2410;
+        }
+        .model-tag {
+            color: var(--gold);
+            font-weight: bold;
+            font-size: 14px;
+            letter-spacing: 1px;
+            margin-bottom: 6px;
+        }
+        .post-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            gap: 10px;
+            min-height: 34px;
+        }
+        .ph-name { font-weight: bold; font-size: 17px; }
+        .ph-meta { color: var(--muted); font-size: 15px; white-space: nowrap; }
+        .chev { display: inline-block; width: 18px; color: var(--primary); }
+        .post-body { padding-top: 12px; }
+        .dimension {
+            margin-bottom: 8px;
+            padding-left: 10px;
+            border-left: 3px solid var(--border);
+        }
+        .dimension.d-s { border-left-color: var(--dimS); }
+        .dimension.d-w { border-left-color: var(--dimW); }
+        .dimension.d-i { border-left-color: var(--dimI); }
+        .dimension.d-f { border-left-color: var(--dimF); }
+        .dimension.d-t { border-left-color: var(--dimT); }
+        .dimension b { margin-right: 6px; }
+        .d-s b { color: var(--dimS); } .d-w b { color: var(--dimW); }
+        .d-i b { color: var(--dimI); } .d-f b { color: var(--dimF); }
+        .d-t b { color: var(--dimT); }
+        .upvote-btn {
+            background: linear-gradient(135deg, #fbbf24, #d97706);
+            color: #451a03;
+            margin: 10px 0 6px;
+            width: auto;
+            padding: 10px 18px;
+        }
+        .critique-section {
+            background: var(--card-2);
+            padding: 14px;
+            border-radius: 10px;
+            margin-top: 12px;
+        }
+        .critique-row { margin-bottom: 10px; }
+        .critiques-list {
+            margin-top: 12px;
+            font-size: 0.92em;
+            border-top: 1px solid var(--border);
+            padding-top: 10px;
+            color: #cbd5e1;
+        }
+        .star { color: var(--gold); }
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+    <!-- Waiting for teacher -->
+    <div id="phase0">
+        <h1>S.W.I.F.T. <span class="spark">Arena</span></h1>
+        <div class="card bigscreen">
+            <span class="emoji">🎬</span>
+            <div class="headline">Get ready…</div>
+            <div class="sub">Waiting for your teacher to launch a question.</div>
+            <p style="margin-top:24px;"><a href="review.html" style="color:var(--primary); font-size:15px;">📖 My Revision Book — see all your past answers & feedback</a></p>
+        </div>
+    </div>
+
+    <!-- Answer phase -->
+    <div id="phase1" class="hidden">
+        <h1>S.W.I.F.T. <span class="spark">Arena</span></h1>
+        <div id="timerBar"></div>
+        <div class="question-banner" id="questionText1"></div>
+        <div class="card hidden question-image" id="questionImageWrap1">
+            <img id="questionImage1" alt="Question image">
+        </div>
+
+        <div class="redo-banner hidden" id="redoBanner">
+            🔄 REDO ROUND — your first answer is below. Use the feedback to make it better!
+        </div>
+        <div class="card hidden" id="redoCard">
+            <strong>💬 Feedback on your first attempt</strong>
+            <div id="redoCrits" class="critiques-list"></div>
+        </div>
+
+        <form id="swiftForm" class="card">
+            <label class="lbl-s" for="dimS">S — Number of Setups</label>
+            <textarea id="dimS" required placeholder="Type your answer here..."></textarea>
+
+            <label class="lbl-w" for="dimW">W — Command Word</label>
+            <textarea id="dimW" required placeholder="Type your answer here..."></textarea>
+
+            <label class="lbl-i" for="dimI">I — Idea of Science</label>
+            <textarea id="dimI" required placeholder="Type your answer here..."></textarea>
+
+            <label class="lbl-f" for="dimF">F — Facts / Data</label>
+            <textarea id="dimF" required placeholder="Type your answer here..."></textarea>
+
+            <label class="lbl-t" for="dimT">T — Tally the Marks</label>
+            <textarea id="dimT" required placeholder="Type your answer here..."></textarea>
+
+            <button type="submit" id="submitBtn">🔒 Lock In My Answer</button>
+        </form>
+    </div>
+
+    <!-- Locked in, waiting for voting to open -->
+    <div id="phaseLocked" class="hidden">
+        <h1>S.W.I.F.T. <span class="spark">Arena</span></h1>
+        <div class="question-banner" id="questionTextL"></div>
+        <div class="card bigscreen">
+            <span class="emoji">🔒</span>
+            <div class="headline">Answer locked in!</div>
+            <div class="bigcount" id="lockedCount">1</div>
+            <div class="sub">answers in so far. Voting opens when your teacher says so…</div>
+        </div>
+    </div>
+
+    <!-- Voting / podium phase -->
+    <div id="phase2" class="hidden">
+        <h2 id="feedTitle">🗳 Vote for the Best Answers</h2>
+        <div class="question-banner" id="questionText2"></div>
+        <div class="card hidden question-image" id="questionImageWrap2">
+            <img id="questionImage2" alt="Question image">
+        </div>
+        <div class="feedbar">
+            <span id="feedCount"></span>
+            <span>
+                <span class="votechip" id="critsLeftChip"></span>
+                <span class="votechip" id="votesLeftChip"></span>
+            </span>
+        </div>
+        <div id="compareContainer"></div>
+        <div id="feedContainer"></div>
+    </div>
+
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    const VOTES_PER_ROUND = 3;
+    const MIN_CHARS = 10;   // minimum characters per dimension ("idk" guard)
+
+    let session = null;        // session/current from DB
+    let currentRound = null;
+    let myPostId = null;
+    let postsRef = null;
+    let latestPosts = {};
+    let timerInterval = null;
+    const expandedPosts = new Set();
+
+    function esc(str) {
+        const div = document.createElement('div');
+        div.textContent = str || '';
+        return div.innerHTML;
+    }
+
+    const DIMS = [
+        ['s', 'S — Number of Setups'],
+        ['w', 'W — Command Word'],
+        ['i', 'I — Idea of Science'],
+        ['f', 'F — Facts / Data'],
+        ['t', 'T — Tally the Marks']
+    ];
+    function renderDims(post) {
+        return DIMS.map(([k, label]) =>
+            `<div class="dimension d-${k}"><b>${label}:</b> ${esc(post[k])}</div>`
+        ).join('');
+    }
+
+    function show(id) {
+        ['phase0', 'phase1', 'phaseLocked', 'phase2'].forEach(p =>
+            document.getElementById(p).classList.toggle('hidden', p !== id));
+    }
+
+    // ---- Auto-handle: each device gets a silent persistent identity, so
+    // students never type or pick a name, but podium/scores/review still work.
+    function getStudentName() {
+        let name = localStorage.getItem('swift-name');
+        if (!name) {
+            const animals = ['Falcon','Tiger','Otter','Comet','Maple','Raven','Bolt','Ember',
+                'Koala','Lynx','Orca','Cobra','Husky','Bison','Heron','Panda','Gecko','Moose'];
+            const a = animals[Math.floor(Math.random() * animals.length)];
+            name = a + '-' + Math.floor(100 + Math.random() * 900);
+            localStorage.setItem('swift-name', name);
+        }
+        return name;
+    }
+
+    // No pasting answers between fields (or from anywhere else),
+    // and auto-save a draft on every keystroke so nothing is lost to a
+    // reload, an iPad going to sleep, or an accidental tab switch.
+    ['dimS', 'dimW', 'dimI', 'dimF', 'dimT'].forEach(id => {
+        const el = document.getElementById(id);
+        el.addEventListener('paste', e => e.preventDefault());
+        el.addEventListener('input', saveDraft);
+    });
+
+    function draftKey() { return 'swift-draft-' + currentRound; }
+
+    function saveDraft() {
+        if (!currentRound || myPostId) return; // no round, or already locked in
+        const d = {};
+        DIMS.forEach(([k]) => d[k] = document.getElementById('dim' + k.toUpperCase()).value);
+        localStorage.setItem(draftKey(), JSON.stringify(d));
+    }
+
+    function restoreDraft() {
+        const raw = localStorage.getItem(draftKey());
+        if (!raw) return false;
+        try {
+            const d = JSON.parse(raw);
+            DIMS.forEach(([k]) => {
+                if (d[k]) document.getElementById('dim' + k.toUpperCase()).value = d[k];
+            });
+            return true;
+        } catch (_) { return false; }
+    }
+
+    // ---- Session listener: question, image, timer, phase ----
+    db.ref('session/current').on('value', snap => {
+        session = snap.val();
+        applySession();
+    });
+
+    function applySession() {
+        if (!session || !session.roundId) {
+            currentRound = null;
+            if (postsRef) { postsRef.off(); postsRef = null; }
+            show('phase0');
+            return;
+        }
+        if (session.roundId !== currentRound) startRound();
+
+        ['questionText1', 'questionText2', 'questionTextL'].forEach(id =>
+            document.getElementById(id).textContent = session.question);
+        [1, 2].forEach(n => {
+            const wrap = document.getElementById('questionImageWrap' + n);
+            if (session.image) {
+                document.getElementById('questionImage' + n).src = session.image;
+                wrap.classList.remove('hidden');
+            } else {
+                wrap.classList.add('hidden');
+            }
+        });
+        startTimer(session.endsAt);
+        updateScreen();
+    }
+
+    function startRound() {
+        currentRound = session.roundId;
+        myPostId = localStorage.getItem('swift-post-' + currentRound);
+        expandedPosts.clear();
+        latestPosts = {};
+
+        ['dimS', 'dimW', 'dimI', 'dimF', 'dimT'].forEach(id =>
+            document.getElementById(id).value = '');
+        document.getElementById('submitBtn').disabled = false;
+
+        // Restore any auto-saved draft for this round (survives reload/sleep)
+        const hadDraft = myPostId ? false : restoreDraft();
+
+        document.getElementById('redoBanner').classList.add('hidden');
+        document.getElementById('redoCard').classList.add('hidden');
+        // A redo prefills the first attempt, but only if the student hasn't
+        // already started a draft for this redo round (their edits win).
+        if (session.redoOf && !myPostId) loadRedoContext(session.redoOf, hadDraft);
+
+        if (postsRef) postsRef.off();
+        postsRef = db.ref('posts/' + currentRound);
+        postsRef.on('value', snap => {
+            latestPosts = snap.val() || {};
+            updateScreen();
+        });
+        window.scrollTo(0, 0);
+    }
+
+    // Redo round: prefill the form with the student's first attempt and
+    // show the critiques it received, so they revise instead of retyping.
+    function loadRedoContext(origRound, hadDraft) {
+        const oldId = localStorage.getItem('swift-post-' + origRound);
+        if (!oldId) return; // didn't submit in the original round — normal round
+        db.ref('posts/' + origRound + '/' + oldId).once('value').then(snap => {
+            const old = snap.val();
+            if (!old || myPostId) return;
+            // Don't clobber a draft the student already started this round
+            if (!hadDraft) DIMS.forEach(([k]) =>
+                document.getElementById('dim' + k.toUpperCase()).value = old[k] || '');
+            document.getElementById('redoBanner').classList.remove('hidden');
+            document.getElementById('redoCard').classList.remove('hidden');
+            const crits = Object.values(old.critiques || {});
+            document.getElementById('redoCrits').innerHTML = crits.length
+                ? crits.map(c => `
+                    <p>${c.starred ? '<span class="star">⭐</span> ' : ''}<em>${esc(c.by)}:</em><br>
+                       <strong>A:</strong> ${esc(c.affirm)} <br>
+                       <strong>C:</strong> ${esc(c.clarify)} <br>
+                       <strong>S:</strong> ${esc(c.suggest)}</p>`).join('<hr>')
+                : '<p>No written feedback on your answer — compare it with the model answer you saw.</p>';
+        });
+    }
+
+    function updateScreen() {
+        if (!session || !session.roundId) return;
+        const phase = session.phase || 'answer';
+
+        if (!myPostId) { show('phase1'); return; } // not yet submitted (any phase)
+
+        if (phase === 'answer') {
+            document.getElementById('lockedCount').textContent =
+                Object.keys(latestPosts).length;
+            show('phaseLocked');
+        } else {
+            document.getElementById('feedTitle').textContent =
+                phase === 'podium' ? '🏆 Round Results' : '🗳 Vote for the Best Answers';
+            renderFeed();
+            show('phase2');
+        }
+    }
+
+    // ---- Countdown ----
+    function startTimer(endsAt) {
+        clearInterval(timerInterval);
+        const bar = document.getElementById('timerBar');
+        if (!endsAt) { bar.textContent = ''; return; }
+        function tick() {
+            const left = Math.max(0, Math.round((endsAt - Date.now()) / 1000));
+            const m = Math.floor(left / 60), s = String(left % 60).padStart(2, '0');
+            bar.textContent = left > 0 ? `⏱ ${m}:${s}` : "⏱ Time's up — lock in now!";
+            bar.classList.toggle('urgent', left <= 60);
+            if (left <= 0) clearInterval(timerInterval);
+        }
+        tick();
+        timerInterval = setInterval(tick, 1000);
+    }
+
+    // ---- Submit ----
+    document.getElementById('swiftForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const btn = document.getElementById('submitBtn');
+        btn.disabled = true;
+
+        const name = getStudentName();
+
+        // Minimum effort per dimension
+        for (const [k, label] of DIMS) {
+            const v = document.getElementById('dim' + k.toUpperCase()).value.trim();
+            if (v.length < MIN_CHARS) {
+                alert(`Your "${label}" answer is too short — write at least ${MIN_CHARS} characters of real thinking.`);
+                btn.disabled = false;
+                return;
+            }
+        }
+
+        localStorage.setItem('swift-name', name);
+
+        const newPost = {
+            name: name,
+            s: document.getElementById('dimS').value,
+            w: document.getElementById('dimW').value,
+            i: document.getElementById('dimI').value,
+            f: document.getElementById('dimF').value,
+            t: document.getElementById('dimT').value,
+            upvotes: 0,
+            submittedAt: firebase.database.ServerValue.TIMESTAMP
+        };
+
+        const ref = db.ref('posts/' + currentRound).push();
+        ref.set(newPost)
+            .then(() => {
+                myPostId = ref.key;
+                localStorage.setItem('swift-post-' + currentRound, myPostId);
+                localStorage.removeItem(draftKey()); // locked in — draft no longer needed
+                updateScreen();
+                window.scrollTo(0, 0);
+            })
+            .catch(err => {
+                alert('Could not submit — check your internet connection and try again.');
+                console.error(err);
+                btn.disabled = false;
+            });
+    });
+
+    // ---- Votes-left budget (per round, per device) ----
+    function votesLeft() {
+        const v = localStorage.getItem('swift-votesleft-' + currentRound);
+        return v === null ? VOTES_PER_ROUND : parseInt(v, 10);
+    }
+
+    // ---- Critiques-left budget (limit set by teacher per round) ----
+    function critLimit() {
+        return (session && session.critLimit != null) ? session.critLimit : 2;
+    }
+    function critsLeft() {
+        const v = localStorage.getItem('swift-critsleft-' + currentRound);
+        return v === null ? critLimit() : parseInt(v, 10);
+    }
+
+    // ---- Feed ----
+    function togglePost(postId) {
+        if (expandedPosts.has(postId)) expandedPosts.delete(postId);
+        else expandedPosts.add(postId);
+        renderFeed();
+    }
+
+    // ---- Self-comparison against the model answer (podium phase) ----
+    function selfCheck(dim, val) {
+        if (!myPostId) return;
+        db.ref(`posts/${currentRound}/${myPostId}/selfcheck/${dim}`).set(val);
+    }
+
+    function renderCompare(winnerId) {
+        const box = document.getElementById('compareContainer');
+        const model = latestPosts[winnerId];
+        const mine = latestPosts[myPostId];
+        if (!model || !mine) { box.innerHTML = ''; return; }
+
+        if (winnerId === myPostId) {
+            box.innerHTML = `<div class="card" style="border:2px solid var(--gold); text-align:center;">
+                <strong style="color:var(--gold); font-size:18px;">🏆 YOUR answer is the Model Answer — take a bow!</strong>
+            </div>`;
+            return;
+        }
+
+        const checks = mine.selfcheck || {};
+        box.innerHTML = `<div class="card">
+            <strong>🪞 Compare with the Model Answer</strong>
+            <p style="color:var(--muted); font-size:14px; margin:6px 0 0;">For each part: is yours as good as the model, or does it need work? Be honest — this is for you.</p>
+            ${DIMS.map(([k, label]) => `
+                <div class="cmp-dim">
+                    <div class="cmp-label d-${k}">${label}</div>
+                    <div class="cmp-row"><span class="cmp-tag model">MODEL</span>${esc(model[k])}</div>
+                    <div class="cmp-row"><span class="cmp-tag mine">MINE</span>${esc(mine[k])}</div>
+                    <div class="cmp-btns">
+                        <button class="cmp-btn ok${checks[k] === 'ok' ? ' sel' : ''}" onclick="selfCheck('${k}','ok')">✅ Mine is as good</button>
+                        <button class="cmp-btn fix${checks[k] === 'fix' ? ' sel' : ''}" onclick="selfCheck('${k}','fix')">🔧 Needs work</button>
+                    </div>
+                </div>`).join('')}
+        </div>`;
+    }
+
+    function renderFeed() {
+        const feed = document.getElementById('feedContainer');
+        const phase = session.phase || 'vote';
+        const anonymous = phase !== 'podium';
+        const winnerId = session.podium ? session.podium.first.id : null;
+
+        if (phase === 'podium' && winnerId && myPostId) renderCompare(winnerId);
+        else document.getElementById('compareContainer').innerHTML = '';
+
+        // Preserve typed-but-unsubmitted critique text and keyboard focus
+        const savedInputs = {};
+        feed.querySelectorAll('input[id]').forEach(i => {
+            if (i.value) savedInputs[i.id] = i.value;
+        });
+        const focusedId = document.activeElement ? document.activeElement.id : null;
+
+        feed.innerHTML = '';
+
+        // Stable numbering by submission order (matches the projector)
+        const bySubmit = Object.entries(latestPosts)
+            .map(([id, p]) => ({ id, ...p }))
+            .sort((a, b) => (a.submittedAt || 0) - (b.submittedAt || 0));
+        const numOf = {};
+        bySubmit.forEach((p, i) => numOf[p.id] = i + 1);
+
+        let posts = [...bySubmit];
+        if (phase === 'podium') {
+            posts.sort((a, b) => (b.upvotes || 0) - (a.upvotes || 0));
+            // Crowned model answer pinned to the very top
+            const wIdx = posts.findIndex(p => p.id === winnerId);
+            if (wIdx > 0) posts.unshift(posts.splice(wIdx, 1)[0]);
+        } else {
+            // Own post pinned first during voting
+            const mineIdx = posts.findIndex(p => p.id === myPostId);
+            if (mineIdx > 0) posts.unshift(posts.splice(mineIdx, 1)[0]);
+        }
+
+        document.getElementById('feedCount').textContent =
+            posts.length + (posts.length === 1 ? ' answer' : ' answers') + ' · tap to open';
+        const left = votesLeft();
+        const chip = document.getElementById('votesLeftChip');
+        chip.textContent = phase === 'podium' ? 'Voting closed' : `🗳 Votes left: ${left}`;
+        chip.classList.toggle('empty', phase === 'podium' || left === 0);
+
+        const cLeft = critsLeft();
+        const cChip = document.getElementById('critsLeftChip');
+        cChip.textContent = phase === 'podium' ? '' : `💬 Critiques left: ${cLeft}`;
+        cChip.classList.toggle('empty', cLeft === 0);
+        cChip.classList.toggle('hidden', phase === 'podium');
+
+        posts.forEach(post => {
+            const mine = post.id === myPostId;
+            const isModel = phase === 'podium' && post.id === winnerId;
+            const voted = localStorage.getItem(`swift-vote-${currentRound}-${post.id}`);
+            const critiques = Object.entries(post.critiques || {});
+            const open = expandedPosts.has(post.id) || isModel;
+            const displayName = anonymous
+                ? `Answer #${numOf[post.id]}`
+                : esc(post.name);
+
+            const canVote = phase === 'vote' && !mine && !voted && left > 0;
+            const critiquedThis = localStorage.getItem(`swift-crit-${currentRound}-${post.id}`);
+            const canCritique = phase === 'vote' && !mine && !critiquedThis && cLeft > 0;
+
+            const postEl = document.createElement('div');
+            postEl.className = 'card post' + (mine ? ' mine' : '') + (isModel ? ' model' : '');
+
+            let html = `
+                ${isModel ? '<div class="model-tag">🏆 MODEL ANSWER — CLASS CHAMPION</div>' : ''}
+                <div class="post-header" onclick="togglePost('${post.id}')">
+                    <span class="ph-name"><span class="chev">${open ? '▾' : '▸'}</span>${displayName}${mine ? ' (you)' : ''}</span>
+                    <span class="ph-meta">👍 ${post.upvotes || 0} · 💬 ${critiques.length}</span>
+                </div>
+                <div class="post-body${open ? '' : ' hidden'}">
+                    ${renderDims(post)}
+                    <button class="upvote-btn" onclick="upvote('${post.id}')" ${canVote ? '' : 'disabled'}>
+                        👍 ${voted ? 'Upvoted!' : 'Upvote'} (${post.upvotes || 0})
+                    </button>`;
+
+            if (canCritique) {
+                html += `
+                    <div class="critique-section">
+                        <strong>Peer Critique (ACS)</strong>
+                        <div class="critique-row"><input type="text" id="affirm-${post.id}" placeholder="Affirm: What did they do well?"></div>
+                        <div class="critique-row"><input type="text" id="clarify-${post.id}" placeholder="Clarify: What questions do you have?"></div>
+                        <div class="critique-row"><input type="text" id="suggest-${post.id}" placeholder="Suggest: How can they improve?"></div>
+                        <button style="padding: 8px; margin-top: 5px;" onclick="submitCritique('${post.id}')">Submit Feedback</button>
+                    </div>`;
+            }
+
+            if (critiques.length) {
+                html += `<div class="critiques-list">
+                    ${critiques.map(([cid, c]) => `
+                        <p>${c.starred ? '<span class="star">⭐</span> ' : ''}<em>${esc(c.by)}:</em><br>
+                           <strong>A:</strong> ${esc(c.affirm)} <br>
+                           <strong>C:</strong> ${esc(c.clarify)} <br>
+                           <strong>S:</strong> ${esc(c.suggest)}</p><hr>
+                    `).join('')}
+                </div>`;
+            }
+
+            html += `</div>`;
+            postEl.innerHTML = html;
+            feed.appendChild(postEl);
+        });
+
+        Object.entries(savedInputs).forEach(([id, val]) => {
+            const el = document.getElementById(id);
+            if (el) el.value = val;
+        });
+        if (focusedId) {
+            const el = document.getElementById(focusedId);
+            if (el) {
+                el.focus();
+                const len = el.value.length;
+                el.setSelectionRange(len, len);
+            }
+        }
+    }
+
+    // 3 votes per round, max one per post, never your own.
+    function upvote(postId) {
+        if (postId === myPostId) return;
+        if ((session.phase || '') !== 'vote') return;
+        const voteKey = `swift-vote-${currentRound}-${postId}`;
+        if (localStorage.getItem(voteKey)) return;
+        const left = votesLeft();
+        if (left <= 0) return;
+        localStorage.setItem(voteKey, '1');
+        localStorage.setItem('swift-votesleft-' + currentRound, String(left - 1));
+        db.ref(`posts/${currentRound}/${postId}/upvotes`)
+          .transaction(v => (v || 0) + 1);
+    }
+
+    function submitCritique(postId) {
+        const affirm = document.getElementById(`affirm-${postId}`).value.trim();
+        const clarify = document.getElementById(`clarify-${postId}`).value.trim();
+        const suggest = document.getElementById(`suggest-${postId}`).value.trim();
+
+        if (!affirm || !clarify || !suggest) {
+            alert('Please fill out all three fields (Affirm, Clarify, Suggest).');
+            return;
+        }
+        // Budget: max one critique per post, limited total per round
+        if (localStorage.getItem(`swift-crit-${currentRound}-${postId}`)) return;
+        const cLeft = critsLeft();
+        if (cLeft <= 0) { alert('You have used all your critiques for this round.'); return; }
+        localStorage.setItem(`swift-crit-${currentRound}-${postId}`, '1');
+        localStorage.setItem('swift-critsleft-' + currentRound, String(cLeft - 1));
+        // Clear before the push triggers a re-render, so the submitted
+        // text isn't restored into the boxes.
+        ['affirm', 'clarify', 'suggest'].forEach(f =>
+            document.getElementById(`${f}-${postId}`).value = '');
+        db.ref(`posts/${currentRound}/${postId}/critiques`).push({
+            by: localStorage.getItem('swift-name') || 'Anonymous',
+            affirm, clarify, suggest
+        });
+    }
+</script>
+
+</body>
+</html>

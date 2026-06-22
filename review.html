@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S.W.I.F.T. Arena — My Revision Book</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --card-2: #243349;
+            --border: #334155;
+            --text: #e2e8f0;
+            --muted: #94a3b8;
+            --primary: #38bdf8;
+            --gold: #fbbf24;
+            --green: #34d399;
+            --dimS: #38bdf8;
+            --dimW: #f472b6;
+            --dimI: #a78bfa;
+            --dimF: #34d399;
+            --dimT: #fb923c;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+        }
+        .container { max-width: 850px; margin: 0 auto; }
+        .hidden { display: none !important; }
+        h1 { text-align: center; letter-spacing: 1px; }
+        h1 .spark { color: var(--gold); }
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 20px;
+            margin-bottom: 16px;
+        }
+        select, input[type=text] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            font-size: 16px;
+            background: var(--card-2);
+            color: var(--text);
+        }
+        button {
+            background: linear-gradient(135deg, #38bdf8, #2563eb);
+            color: white;
+            border: none;
+            padding: 14px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 10px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 14px;
+            touch-action: manipulation;
+        }
+        .muted { color: var(--muted); }
+        .summary { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; text-align: center; }
+        .summary .num { font-size: 40px; font-weight: bold; color: var(--green); }
+        .summary .lbl { font-size: 13px; color: var(--muted); text-transform: uppercase; }
+        .qhead {
+            background: linear-gradient(135deg, #1e293b, #312e81);
+            border: 1px solid #4338ca;
+            padding: 14px 18px;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .qdate { font-size: 13px; color: var(--muted); font-weight: normal; margin-top: 4px; }
+        .section-tag {
+            display: inline-block;
+            font-size: 12px;
+            font-weight: bold;
+            padding: 3px 10px;
+            border-radius: 999px;
+            margin: 14px 0 8px;
+        }
+        .tag-mine { background: var(--green); color: #022c22; }
+        .tag-model { background: var(--gold); color: #451a03; }
+        .tag-fb { background: #475569; color: white; }
+        .dimension { margin-bottom: 8px; padding-left: 10px; border-left: 3px solid var(--border); }
+        .dimension.d-s { border-left-color: var(--dimS); } .d-s b { color: var(--dimS); }
+        .dimension.d-w { border-left-color: var(--dimW); } .d-w b { color: var(--dimW); }
+        .dimension.d-i { border-left-color: var(--dimI); } .d-i b { color: var(--dimI); }
+        .dimension.d-f { border-left-color: var(--dimF); } .d-f b { color: var(--dimF); }
+        .dimension.d-t { border-left-color: var(--dimT); } .d-t b { color: var(--dimT); }
+        .dimension b { margin-right: 6px; }
+        .crit { font-size: 0.92em; color: #cbd5e1; margin-bottom: 8px; }
+        .star { color: var(--gold); }
+        .winbanner { color: var(--gold); font-weight: bold; }
+        a { color: var(--primary); }
+
+        @media print {
+            body { background: white; color: #111; }
+            .card, .qhead { background: white; border-color: #ccc; color: #111; box-shadow: none; }
+            #picker, #printBtn, .backlink { display: none !important; }
+            .crit { color: #333; }
+            .muted, .qdate { color: #555; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>📖 My Revision <span class="spark">Book</span></h1>
+    <p class="muted backlink" style="text-align:center;"><a href="index.html">← back to the Arena</a></p>
+
+    <div class="card" id="picker">
+        <strong>Who are you?</strong>
+        <div style="margin-top:10px;">
+            <select id="nameSel" class="hidden"></select>
+            <input type="text" id="nameInput" placeholder="Type your name exactly as you used in class">
+        </div>
+        <button onclick="loadBook()">📖 Show My Work</button>
+    </div>
+
+    <div id="bookSummary" class="card hidden">
+        <div class="summary">
+            <div><div class="num" id="sumQ">0</div><div class="lbl">Questions answered</div></div>
+            <div><div class="num" id="sumFb">0</div><div class="lbl">Feedback received</div></div>
+            <div><div class="num" id="sumPod">0</div><div class="lbl">Podium finishes</div></div>
+        </div>
+        <button id="printBtn" onclick="window.print()">🖨 Print / Save as PDF</button>
+    </div>
+
+    <div id="bookContainer"></div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    function esc(str) {
+        const div = document.createElement('div');
+        div.textContent = str || '';
+        return div.innerHTML;
+    }
+
+    const DIMS = [
+        ['s', 'S — Number of Setups'],
+        ['w', 'W — Command Word'],
+        ['i', 'I — Idea of Science'],
+        ['f', 'F — Facts / Data'],
+        ['t', 'T — Tally the Marks']
+    ];
+    function renderDims(post) {
+        return DIMS.map(([k, label]) =>
+            `<div class="dimension d-${k}"><b>${label}:</b> ${esc(post[k])}</div>`
+        ).join('');
+    }
+
+    let roster = [];
+    db.ref('settings/roster').once('value').then(snap => {
+        roster = snap.val() || [];
+        const saved = localStorage.getItem('swift-name') || '';
+        if (roster.length) {
+            const sel = document.getElementById('nameSel');
+            sel.innerHTML = '<option value="">— pick your name —</option>' +
+                roster.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+            if (roster.includes(saved)) sel.value = saved;
+            sel.classList.remove('hidden');
+            document.getElementById('nameInput').classList.add('hidden');
+        } else {
+            document.getElementById('nameInput').value = saved;
+        }
+    });
+
+    function loadBook() {
+        const name = roster.length
+            ? document.getElementById('nameSel').value
+            : document.getElementById('nameInput').value.trim();
+        if (!name) { alert('Pick or type your name first.'); return; }
+        const me = name.toLowerCase();
+
+        Promise.all([
+            db.ref('rounds').once('value'),
+            db.ref('posts').once('value')
+        ]).then(([rSnap, pSnap]) => {
+            const rounds = rSnap.val() || {};
+            const allPosts = pSnap.val() || {};
+            const roundIds = Object.keys(allPosts).sort(); // chronological
+
+            let qCount = 0, fbCount = 0, podCount = 0;
+            const blocks = [];
+
+            roundIds.forEach((rid, idx) => {
+                const posts = allPosts[rid] || {};
+                const meta = rounds[rid] || {};
+                const myEntry = Object.entries(posts).find(([id, p]) =>
+                    (p.name || '').trim().toLowerCase() === me);
+                if (!myEntry) return;
+                const [myId, mine] = myEntry;
+                qCount++;
+
+                const ts = meta.startedAt || parseInt(rid.slice(1), 10);
+                const date = isNaN(ts) ? '' : new Date(ts).toLocaleDateString();
+                const crits = Object.values(mine.critiques || {});
+                fbCount += crits.length;
+
+                const podium = meta.podium || null;
+                let podLine = '';
+                if (podium) {
+                    const places = [['first', '🥇'], ['second', '🥈'], ['third', '🥉']];
+                    for (const [place, medal] of places) {
+                        if (podium[place] && (podium[place].name || '').trim().toLowerCase() === me) {
+                            podCount++;
+                            podLine = `<p class="winbanner">${medal} You made the podium on this question!</p>`;
+                            break;
+                        }
+                    }
+                }
+
+                let modelHtml = '';
+                if (podium && podium.first) {
+                    if (podium.first.id === myId) {
+                        modelHtml = `<span class="section-tag tag-model">MODEL ANSWER</span>
+                            <p class="winbanner">🏆 YOUR answer was crowned the model answer!</p>`;
+                    } else if (posts[podium.first.id]) {
+                        modelHtml = `<span class="section-tag tag-model">MODEL ANSWER (by ${esc(podium.first.name)})</span>
+                            ${renderDims(posts[podium.first.id])}`;
+                    }
+                }
+
+                blocks.push(`<div class="card">
+                    <div class="qhead">Q${qCount}. ${esc(meta.question || '(question not recorded)')}
+                        <div class="qdate">${date} · 👍 ${mine.upvotes || 0} votes</div>
+                    </div>
+                    ${podLine}
+                    <span class="section-tag tag-mine">MY ANSWER</span>
+                    ${renderDims(mine)}
+                    ${crits.length ? `<span class="section-tag tag-fb">FEEDBACK I RECEIVED</span>
+                        ${crits.map(c => `<div class="crit">${c.starred ? '<span class="star">⭐</span> ' : ''}<em>${esc(c.by)}:</em>
+                            <b>A:</b> ${esc(c.affirm)} · <b>C:</b> ${esc(c.clarify)} · <b>S:</b> ${esc(c.suggest)}</div>`).join('')}` : ''}
+                    ${modelHtml}
+                </div>`);
+            });
+
+            document.getElementById('sumQ').textContent = qCount;
+            document.getElementById('sumFb').textContent = fbCount;
+            document.getElementById('sumPod').textContent = podCount;
+            document.getElementById('bookSummary').classList.remove('hidden');
+            document.getElementById('bookContainer').innerHTML = blocks.length
+                ? blocks.join('')
+                : `<div class="card muted" style="text-align:center;">No answers found for "${esc(name)}". Check the spelling matches what you used in class.</div>`;
+        }).catch(err => {
+            alert('Could not load — check your internet connection. (' + err.message + ')');
+        });
+    }
+</script>
+
+</body>
+</html>
