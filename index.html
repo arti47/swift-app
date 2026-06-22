@@ -271,6 +271,16 @@
             border-radius: 999px; padding: 4px 10px;
             text-decoration: none; z-index: 60;
         }
+        .conn-banner {
+            position: fixed; top: 0; left: 0; right: 0;
+            background: #b45309; color: #fff;
+            text-align: center; font-weight: bold;
+            padding: 8px; font-size: 15px; z-index: 250;
+        }
+        .charcount { font-size: 12px; color: var(--muted); text-align: right; margin-top: 3px; }
+        .charcount.ok { color: var(--green); }
+        .form-hint { text-align: center; color: var(--muted); font-size: 13px; margin-top: 8px; }
+        #timerBar.paused { color: var(--muted); animation: none; }
     </style>
 </head>
 <body>
@@ -294,6 +304,7 @@
     </div>
 </div>
 <a class="switch-link hidden" id="switchLink" href="#" onclick="switchStudent();return false;"></a>
+<div id="connBanner" class="conn-banner hidden">🔌 Reconnecting… your work is saved on this device.</div>
 
 <div class="container">
 
@@ -328,20 +339,26 @@
         <form id="swiftForm" class="card">
             <label class="lbl-s" for="dimS">S — Number of Setups</label>
             <textarea id="dimS" required placeholder="Type your answer here..."></textarea>
+            <div class="charcount" id="cc-S"></div>
 
             <label class="lbl-w" for="dimW">W — Command Word</label>
             <textarea id="dimW" required placeholder="Type your answer here..."></textarea>
+            <div class="charcount" id="cc-W"></div>
 
             <label class="lbl-i" for="dimI">I — Idea of Science</label>
             <textarea id="dimI" required placeholder="Type your answer here..."></textarea>
+            <div class="charcount" id="cc-I"></div>
 
             <label class="lbl-f" for="dimF">F — Facts / Data</label>
             <textarea id="dimF" required placeholder="Type your answer here..."></textarea>
+            <div class="charcount" id="cc-F"></div>
 
             <label class="lbl-t" for="dimT">T — Tally the Marks</label>
             <textarea id="dimT" required placeholder="Type your answer here..."></textarea>
+            <div class="charcount" id="cc-T"></div>
 
             <button type="submit" id="submitBtn">🔒 Lock In My Answer</button>
+            <div id="formHint" class="form-hint"></div>
         </form>
     </div>
 
@@ -544,13 +561,42 @@
     // Require an identity before doing anything else.
     if (!getStudentName()) showIdGate(); else updateSwitchLink();
 
+    // ---- Connection banner: reassure students if Firebase drops ----
+    let connTimer = null;
+    db.ref('.info/connected').on('value', s => {
+        const online = s.val() === true;
+        const banner = document.getElementById('connBanner');
+        clearTimeout(connTimer);
+        if (online) { banner.classList.add('hidden'); }
+        else { connTimer = setTimeout(() => banner.classList.remove('hidden'), 2000); }
+    });
+
+    // ---- Live answer validation: counts + gate the submit button ----
+    function updateCounts() {
+        let ok = true;
+        DIMS.forEach(([k]) => {
+            const v = document.getElementById('dim' + k.toUpperCase()).value.trim();
+            const cc = document.getElementById('cc-' + k.toUpperCase());
+            if (cc) {
+                cc.textContent = Math.min(v.length, 999) + ' / ' + MIN_CHARS + (v.length >= MIN_CHARS ? ' ✓' : '');
+                cc.classList.toggle('ok', v.length >= MIN_CHARS);
+            }
+            if (v.length < MIN_CHARS) ok = false;
+        });
+        const btn = document.getElementById('submitBtn');
+        if (!myPostId) btn.disabled = !ok; // only gate before lock-in
+        document.getElementById('formHint').textContent =
+            ok ? '' : `Write at least ${MIN_CHARS} characters in each of the 5 parts to lock in.`;
+        return ok;
+    }
+
     // No pasting answers between fields (or from anywhere else),
     // and auto-save a draft on every keystroke so nothing is lost to a
     // reload, an iPad going to sleep, or an accidental tab switch.
     ['dimS', 'dimW', 'dimI', 'dimF', 'dimT'].forEach(id => {
         const el = document.getElementById(id);
         el.addEventListener('paste', e => e.preventDefault());
-        el.addEventListener('input', saveDraft);
+        el.addEventListener('input', () => { saveDraft(); updateCounts(); });
     });
 
     function draftKey() { return 'swift-draft-' + currentRound; }
@@ -600,7 +646,7 @@
                 wrap.classList.add('hidden');
             }
         });
-        startTimer(session.endsAt);
+        startTimer(session);
         updateScreen();
     }
 
@@ -616,6 +662,7 @@
 
         // Restore any auto-saved draft for this round (survives reload/sleep)
         const hadDraft = myPostId ? false : restoreDraft();
+        updateCounts();
 
         document.getElementById('redoBanner').classList.add('hidden');
         document.getElementById('redoCard').classList.add('hidden');
@@ -643,6 +690,7 @@
             // Don't clobber a draft the student already started this round
             if (!hadDraft) DIMS.forEach(([k]) =>
                 document.getElementById('dim' + k.toUpperCase()).value = old[k] || '');
+            updateCounts();
             document.getElementById('redoBanner').classList.remove('hidden');
             document.getElementById('redoCard').classList.remove('hidden');
             const crits = Object.values(old.critiques || {});
@@ -674,15 +722,27 @@
         }
     }
 
-    // ---- Countdown ----
-    function startTimer(endsAt) {
+    // ---- Countdown (pause-aware) ----
+    function fmt(ms) {
+        const left = Math.max(0, Math.round(ms / 1000));
+        return Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0');
+    }
+    function startTimer(s) {
         clearInterval(timerInterval);
         const bar = document.getElementById('timerBar');
-        if (!endsAt) { bar.textContent = ''; return; }
+        bar.classList.remove('paused');
+        if (s && s.paused && s.pauseLeft != null) {
+            bar.textContent = '⏸ ' + fmt(s.pauseLeft) + ' (paused)';
+            bar.classList.add('paused');
+            bar.classList.remove('urgent');
+            return;
+        }
+        const endsAt = s && s.endsAt;
+        if (!endsAt) { bar.textContent = ''; bar.classList.remove('urgent'); return; }
         function tick() {
-            const left = Math.max(0, Math.round((endsAt - Date.now()) / 1000));
-            const m = Math.floor(left / 60), s = String(left % 60).padStart(2, '0');
-            bar.textContent = left > 0 ? `⏱ ${m}:${s}` : "⏱ Time's up — lock in now!";
+            const leftMs = endsAt - Date.now();
+            const left = Math.max(0, Math.round(leftMs / 1000));
+            bar.textContent = left > 0 ? '⏱ ' + fmt(leftMs) : "⏱ Time's up — lock in now!";
             bar.classList.toggle('urgent', left <= 60);
             if (left <= 0) clearInterval(timerInterval);
         }
