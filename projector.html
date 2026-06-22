@@ -102,9 +102,17 @@
         th, td { padding: 10px 16px; border-bottom: 1px solid var(--border); text-align: left; }
         th { color: var(--muted); font-size: 16px; text-transform: uppercase; }
         td.pts { font-weight: bold; color: var(--gold); }
+        .conn-banner {
+            position: fixed; top: 0; left: 0; right: 0;
+            background: #b45309; color: #fff;
+            text-align: center; font-weight: bold;
+            padding: 12px; font-size: 22px; z-index: 250;
+        }
     </style>
 </head>
 <body>
+
+<div id="connBanner" class="conn-banner hidden">🔌 Reconnecting to the server…</div>
 
 <div class="container">
     <h1>S.W.I.F.T. <span class="spark">Arena</span></h1>
@@ -186,6 +194,15 @@
 <script>
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
+
+    // Connection banner: show if the projector loses the server.
+    let connTimer = null;
+    db.ref('.info/connected').on('value', s => {
+        const banner = document.getElementById('connBanner');
+        clearTimeout(connTimer);
+        if (s.val() === true) banner.classList.add('hidden');
+        else connTimer = setTimeout(() => banner.classList.remove('hidden'), 2000);
+    });
 
     let session = null;
     let currentRound = null;
@@ -271,7 +288,7 @@
         } else {
             document.getElementById('qImgWrapA').classList.add('hidden');
         }
-        startTimer(session.endsAt);
+        startTimer(session);
         updateStats();
 
         // Spotlight overrides whatever phase screen would show (stays anonymous)
@@ -331,16 +348,25 @@
             posts.reduce((n, p) => n + Object.keys(p.critiques || {}).length, 0);
     }
 
-    function startTimer(endsAt) {
+    function fmt(ms) {
+        const left = Math.max(0, Math.round(ms / 1000));
+        return Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0');
+    }
+    function startTimer(s) {
         clearInterval(timerInterval);
         const el = document.getElementById('timerBig');
-        if (!endsAt) { el.textContent = '–'; el.classList.remove('urgent'); return; }
+        el.classList.remove('urgent');
+        if (s && s.paused && s.pauseLeft != null) {
+            el.textContent = '⏸ ' + fmt(s.pauseLeft);
+            return;
+        }
+        const endsAt = s && s.endsAt;
+        if (!endsAt) { el.textContent = '–'; return; }
         function tick() {
-            const left = Math.max(0, Math.round((endsAt - Date.now()) / 1000));
-            const m = Math.floor(left / 60), s = String(left % 60).padStart(2, '0');
-            el.textContent = `${m}:${s}`;
-            el.classList.toggle('urgent', left <= 60);
-            if (left <= 0) clearInterval(timerInterval);
+            const leftMs = endsAt - Date.now();
+            el.textContent = fmt(leftMs);
+            el.classList.toggle('urgent', leftMs <= 60000);
+            if (leftMs <= 0) clearInterval(timerInterval);
         }
         tick();
         timerInterval = setInterval(tick, 1000);

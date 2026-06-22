@@ -89,6 +89,8 @@ session/current                     # the one live round, or null when idle
   model          { s,w,i,f,t } | null      # teacher's pre-authored model answer (shown at podium)
   showModel      bool                      # podium debrief: flip the projector to the model answer
   endsAt         epoch ms | null           # countdown end, or null = no timer
+  paused         bool                      # timer paused (teacher live control)
+  pauseLeft      ms                        # remaining time captured while paused
   startedAt      server timestamp
   redoOf         roundId                   # present only on a redo round
   podium         { first|second|third: {id, name} }   # set when validated
@@ -247,6 +249,17 @@ Ordered roughly by teaching value. Confirm scope with the teacher before buildin
 
 Keep newest first. One line per meaningful change. Dates in YYYY-MM-DD.
 
+- 2026-06-22 — User-friendliness batch (student + teacher): **(1)** connection
+  banner on `index/teacher/projector` — a "🔌 Reconnecting…" bar driven by Firebase
+  `.info/connected` (2s debounce) so flaky-wifi drops are obvious. **(2)** live
+  answer validation on the student form — per-field character counters and the
+  Lock-In button stays disabled until all five parts meet the min length (no more
+  after-the-fact alert). **(3)** teacher live timer controls — **⏸ Pause/Resume**
+  and **+1m / +2m** in the Run bar, no re-push needed (new `session.paused` /
+  `session.pauseLeft`; student & projector clocks honour the freeze). **(4)**
+  active-class clarity — the Run bar always shows the live class + roster size,
+  and pushing with **no class selected** now warns (points go to a shared board &
+  students would have to free-type names). No new top-level Firebase paths.
 - 2026-06-22 — **Student identity overhaul: roster pick + personal PIN.** Replaces
   the per-device auto-handle. Students choose their name from the active class
   roster and unlock it with a 4-digit PIN stored at the new `identities/<nameKey>`

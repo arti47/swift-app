@@ -130,6 +130,19 @@
             box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.35);
         }
         #modelProjBtn.on { background: linear-gradient(135deg, #fbbf24, #d97706); color: #451a03; }
+        .mini {
+            margin: 0 0 0 4px; padding: 6px 10px; font-size: 14px;
+            background: var(--card-2); border: 1px solid var(--border); color: var(--text);
+        }
+        #timerBig.paused { color: var(--muted); animation: none; }
+        .active-class-bar { text-align: center; font-size: 14px; margin-bottom: 10px; color: var(--muted); }
+        .active-class-bar.none { color: #fca5a5; font-weight: bold; }
+        .conn-banner {
+            position: fixed; top: 0; left: 0; right: 0;
+            background: #b45309; color: #fff;
+            text-align: center; font-weight: bold;
+            padding: 8px; font-size: 15px; z-index: 250;
+        }
         .ghost-danger { background: none; border: 1px solid #f87171; color: #f87171; }
         .phase-hint { text-align: center; color: var(--muted); font-size: 14px; margin-top: 12px; }
 
@@ -300,6 +313,8 @@
 </head>
 <body>
 
+<div id="connBanner" class="conn-banner hidden">🔌 Reconnecting to the server…</div>
+
 <!-- PIN gate -->
 <div id="pinGate">
     <div class="card">
@@ -323,6 +338,7 @@
 
         <!-- Sticky control + status bar -->
         <div class="runbar">
+            <div class="active-class-bar" id="activeClassBar"></div>
             <div class="step-strip">
                 <span class="step" id="step-answer">① Answer</span>
                 <span class="step-arrow">→</span>
@@ -334,6 +350,11 @@
                 <span>✍️ <b id="countSubmitted">0</b> submitted</span>
                 <span>💬 <b id="countCritiques">0</b> critiques</span>
                 <span>⏱ <span id="timerBig">–</span></span>
+                <span id="timerControls" class="hidden">
+                    <button class="mini" id="pauseBtn" onclick="togglePause()">⏸ Pause</button>
+                    <button class="mini" onclick="extendTimer(1)">+1m</button>
+                    <button class="mini" onclick="extendTimer(2)">+2m</button>
+                </span>
             </div>
             <div class="primary-actions">
                 <button id="openVotingBtn" class="greenbtn hidden" onclick="openVoting()">🗳 Open Voting</button>
@@ -553,6 +574,15 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
+    // Connection banner: warn the teacher if the console loses the server.
+    let connTimer = null;
+    db.ref('.info/connected').on('value', s => {
+        const banner = document.getElementById('connBanner');
+        clearTimeout(connTimer);
+        if (s.val() === true) banner.classList.add('hidden');
+        else connTimer = setTimeout(() => banner.classList.remove('hidden'), 2000);
+    });
+
     const POINTS = { first: 5, second: 3, third: 2, star: 1 };
 
     let currentRound = null;
@@ -667,6 +697,7 @@
     db.ref('settings/roster').on('value', snap => {
         rosterNames = snap.val() || [];
         updateMissing();
+        updateActiveClassBar();
     });
 
     db.ref('settings/activeClass').on('value', snap => {
@@ -675,7 +706,21 @@
             ? `✅ Active class: ${activeClass.name}.`
             : 'No active class selected — shared scoreboard, free-typed names.';
         resubscribeScores();
+        updateActiveClassBar();
     });
+
+    // Always-visible class context in the Run bar.
+    function updateActiveClassBar() {
+        const bar = document.getElementById('activeClassBar');
+        if (activeClass) {
+            bar.textContent = `🏫 ${activeClass.name} · ${rosterNames.length} on roster`;
+            bar.classList.remove('none');
+        } else {
+            bar.textContent = '⚠️ No class selected — go to Setup → Classes → “Use This Class Now” (students will free-type names otherwise)';
+            bar.classList.add('none');
+        }
+    }
+    updateActiveClassBar();
 
     function refreshClassUI() {
         const sel = document.getElementById('classSlot');
@@ -966,6 +1011,7 @@
         slot = slot || curLessonSlot();
         const ql = ((lessons[slot] || {}).questions || [])[i];
         if (!ql) return;
+        if (!confirmNoClass()) return;
         if (!confirmInterrupt()) return;
         const roundId = 'r' + Date.now();
         db.ref('session/current').set({
@@ -1165,10 +1211,18 @@
         return confirm(msg);
     }
 
+    // Warn once if pushing with no active class: scores go to a shared board and
+    // students get no roster to pick from (they'd have to free-type a name).
+    function confirmNoClass() {
+        if (activeClass) return true;
+        return confirm('No class is selected, so:\n\n• points go to a shared scoreboard\n• students have no roster to pick from (they\'ll free-type a name)\n\nGo to Setup → Classes → “Use This Class Now” first, or push anyway?');
+    }
+
     // Ad-hoc question from the Run tab's quick-push box.
     function pushQuestion() {
         const q = document.getElementById('qTextRun').value.trim();
         if (!q && !questionImageRun) { alert('Type a question or attach an image first.'); return; }
+        if (!confirmNoClass()) return;
         if (!confirmInterrupt()) return;
         const mins = parseInt(document.getElementById('qMinutesRun').value, 10);
 
@@ -1206,6 +1260,29 @@
 
     function openVoting() {
         db.ref('session/current').update({ phase: 'vote' });
+    }
+
+    // ---- Live timer controls (extend / pause) ----
+    function extendTimer(mins) {
+        if (!sessionData || !sessionData.roundId) return;
+        if (sessionData.paused && sessionData.pauseLeft != null) {
+            db.ref('session/current/pauseLeft').set(sessionData.pauseLeft + mins * 60000);
+            return;
+        }
+        const cur = sessionData.endsAt;
+        const base = (cur && cur > Date.now()) ? cur : Date.now();
+        db.ref('session/current/endsAt').set(base + mins * 60000);
+    }
+    function togglePause() {
+        if (!sessionData || !sessionData.roundId) return;
+        if (sessionData.paused) { // resume
+            const left = sessionData.pauseLeft != null ? sessionData.pauseLeft : 0;
+            db.ref('session/current').update({ paused: false, endsAt: Date.now() + left, pauseLeft: null });
+        } else {
+            if (!sessionData.endsAt) { alert('No timer running to pause. Use +1m / +2m to start one.'); return; }
+            const left = Math.max(0, sessionData.endsAt - Date.now());
+            db.ref('session/current').update({ paused: true, pauseLeft: left });
+        }
     }
 
     // Same question again: students improve their first attempt using the
@@ -1414,6 +1491,12 @@
         document.getElementById('replayBtn').classList.toggle('hidden',
             !(sessionData && sessionData.podium));
 
+        // Timer controls: available whenever a round is live (answer/vote)
+        const tc = document.getElementById('timerControls');
+        tc.classList.toggle('hidden', !(phase === 'answer' || phase === 'vote'));
+        const paused = !!(sessionData && sessionData.paused);
+        document.getElementById('pauseBtn').textContent = paused ? '▶ Resume' : '⏸ Pause';
+
         // Model-on-projector toggle: only at podium
         const mp = document.getElementById('modelProjBtn');
         mp.classList.toggle('hidden', phase !== 'podium');
@@ -1463,7 +1546,7 @@
         } else {
             document.getElementById('liveImageWrap').classList.add('hidden');
         }
-        startTimer(sessionData.endsAt);
+        startTimer(sessionData);
 
         if (sessionData.roundId !== currentRound) {
             currentRound = sessionData.roundId;
@@ -1493,16 +1576,26 @@
         ).join('');
     }
 
-    function startTimer(endsAt) {
+    function fmtMs(ms) {
+        const left = Math.max(0, Math.round(ms / 1000));
+        return Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0');
+    }
+    function startTimer(s) {
         clearInterval(timerInterval);
         const el = document.getElementById('timerBig');
-        if (!endsAt) { el.textContent = '–'; el.classList.remove('urgent'); return; }
+        el.classList.remove('urgent', 'paused');
+        if (s && s.paused && s.pauseLeft != null) {
+            el.textContent = '⏸ ' + fmtMs(s.pauseLeft);
+            el.classList.add('paused');
+            return;
+        }
+        const endsAt = s && s.endsAt;
+        if (!endsAt) { el.textContent = '–'; return; }
         function tick() {
-            const left = Math.max(0, Math.round((endsAt - Date.now()) / 1000));
-            const m = Math.floor(left / 60), s = String(left % 60).padStart(2, '0');
-            el.textContent = `${m}:${s}`;
-            el.classList.toggle('urgent', left <= 60);
-            if (left <= 0) clearInterval(timerInterval);
+            const leftMs = endsAt - Date.now();
+            el.textContent = fmtMs(leftMs);
+            el.classList.toggle('urgent', leftMs <= 60000);
+            if (leftMs <= 0) clearInterval(timerInterval);
         }
         tick();
         timerInterval = setInterval(tick, 1000);
