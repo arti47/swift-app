@@ -137,6 +137,7 @@
         #timerBig.paused { color: var(--muted); animation: none; }
         .active-class-bar { text-align: center; font-size: 14px; margin-bottom: 10px; color: var(--muted); }
         .active-class-bar.none { color: #fca5a5; font-weight: bold; }
+        .stuck-bar { text-align: center; font-size: 15px; margin-bottom: 10px; color: #fb923c; font-weight: bold; }
         .conn-banner {
             position: fixed; top: 0; left: 0; right: 0;
             background: #b45309; color: #fff;
@@ -339,6 +340,7 @@
         <!-- Sticky control + status bar -->
         <div class="runbar">
             <div class="active-class-bar" id="activeClassBar"></div>
+            <div class="stuck-bar hidden" id="stuckBar"></div>
             <div class="step-strip">
                 <span class="step" id="step-answer">① Answer</span>
                 <span class="step-arrow">→</span>
@@ -414,6 +416,8 @@
         <div class="card hidden" id="liveImageWrap" style="text-align:center;">
             <img id="liveImage" style="max-width:100%; max-height:420px; border-radius:8px;">
         </div>
+
+        <div class="card hidden" id="mostImproved" style="text-align:center; color:var(--green); font-weight:bold; font-size:18px;"></div>
 
         <div class="card hidden" id="selfcheckCard">
             <h2>🪞 Self-Check Tally</h2>
@@ -1549,6 +1553,16 @@
             ? PHASE_HINTS[phase]
             : 'No active question — push one from the panel below.';
 
+        // "I'm stuck" signals (answer phase only)
+        const stuck = (sessionData && sessionData.stuck) ? Object.values(sessionData.stuck) : [];
+        const sb = document.getElementById('stuckBar');
+        if (phase === 'answer' && stuck.length) {
+            sb.classList.remove('hidden');
+            sb.textContent = `🙋 ${stuck.length} need help: ${stuck.join(', ')}`;
+        } else {
+            sb.classList.add('hidden');
+        }
+
         // Give the feed room: auto-collapse the push panel when voting opens.
         if (phase === 'vote' && prevPhase !== 'vote') collapsePush();
         prevPhase = phase;
@@ -1585,6 +1599,7 @@
 
         if (sessionData.roundId !== currentRound) {
             currentRound = sessionData.roundId;
+            improvedShownFor = null; // recompute "most improved" for the new round
             document.getElementById('validatePanel').classList.add('hidden');
             if (postsRef) postsRef.off();
             postsRef = db.ref('posts/' + currentRound);
@@ -1659,6 +1674,7 @@
             posts.reduce((n, p) => n + Object.keys(p.critiques || {}).length, 0);
         updateMissing();
         updateSelfcheckTally(posts);
+        maybeMostImproved();
 
         const feed = document.getElementById('feedContainer');
         feed.innerHTML = '';
@@ -1721,6 +1737,35 @@
             `;
             feed.appendChild(el);
         });
+    }
+
+    // ---- "Most improved": biggest upvote gain vs the first attempt (redo) ----
+    let improvedShownFor = null;
+    function maybeMostImproved() {
+        const el = document.getElementById('mostImproved');
+        if (!(sessionData && sessionData.phase === 'podium' && sessionData.redoOf)) {
+            el.classList.add('hidden'); return;
+        }
+        if (improvedShownFor === currentRound) return; // compute once per round
+        improvedShownFor = currentRound;
+        db.ref('posts/' + sessionData.redoOf).once('value').then(snap => {
+            const orig = {};
+            Object.values(snap.val() || {}).forEach(p => { orig[scoreKey(p.name)] = (p.upvotes || 0); });
+            let best = null;
+            Object.values(latestPosts).forEach(p => {
+                const k = scoreKey(p.name);
+                if (k in orig) {
+                    const delta = (p.upvotes || 0) - orig[k];
+                    if (delta > 0 && (!best || delta > best.delta)) best = { name: p.name, delta };
+                }
+            });
+            if (best) {
+                el.textContent = `📈 Most improved: ${best.name} (+${best.delta} votes vs first attempt)`;
+                el.classList.remove('hidden');
+            } else {
+                el.classList.add('hidden');
+            }
+        }).catch(() => {});
     }
 
     // ---- Self-check tally: where does the class think it's weak? ----
@@ -1803,10 +1848,12 @@
             if (!roundIds.length) { alert('No responses match that class / lesson filter.'); return; }
 
             const cell = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+            const selfMark = v => v === 'ok' ? '✅ as good' : (v === 'fix' ? '🔧 needs work' : '');
             const rows = [[
                 'Question #', 'Date', 'Class', 'Lesson', 'Question', 'Student',
                 'S — Number of Setups', 'W — Command Word', 'I — Idea of Science',
                 'F — Facts / Data', 'T — Tally the Marks',
+                'Self-check S', 'Self-check W', 'Self-check I', 'Self-check F', 'Self-check T',
                 'Upvotes', 'Critiques received'
             ].map(cell).join(',')];
 
@@ -1820,9 +1867,11 @@
                     const crits = Object.values(p.critiques || {})
                         .map(c => `${c.starred ? '⭐ ' : ''}${c.by} — Affirm: ${c.affirm} / Clarify: ${c.clarify} / Suggest: ${c.suggest}`)
                         .join('  ||  ');
+                    const sc = p.selfcheck || {};
                     rows.push([
                         idx + 1, date, className, lessonName, meta.question || '(question not recorded)',
                         p.name, p.s, p.w, p.i, p.f, p.t,
+                        selfMark(sc.s), selfMark(sc.w), selfMark(sc.i), selfMark(sc.f), selfMark(sc.t),
                         p.upvotes || 0, crits
                     ].map(cell).join(','));
                 });

@@ -92,6 +92,7 @@ session/current                     # the one live round, or null when idle
   timerMins      number                    # the round's configured minutes (default 3; used by ↺ Reset)
   paused         bool                      # timer paused (teacher live control)
   pauseLeft      ms                        # remaining time captured while paused
+  stuck          { nameKey: name }         # students who tapped "I'm stuck" (answer phase; teacher-only)
   startedAt      server timestamp
   redoOf         roundId                   # present only on a redo round
   podium         { first|second|third: {id, name} }   # set when validated
@@ -155,7 +156,8 @@ separate state: `swift-post-<roundId>-<nameKey>` (their submission id),
 `swift-votesleft-<roundId>-<nameKey>`, `swift-vote-<roundId>-<nameKey>-<postId>`,
 `swift-critsleft-<roundId>-<nameKey>`, `swift-crit-<roundId>-<nameKey>-<postId>`,
 `swift-draft-<roundId>-<nameKey>` (auto-saved draft). Switching identity re-inits
-the round for the new student (clears the stale `myPostId`).
+the round for the new student (clears the stale `myPostId`). Also `swift-textsize`
+(`big`|`normal`, accessibility toggle).
 Teacher: `swift-teacher-pin`, `swift-runner-<lessonSlot>` (next-question pointer).
 
 ---
@@ -255,6 +257,14 @@ Ordered roughly by teaching value. Confirm scope with the teacher before buildin
 
 Keep newest first. One line per meaningful change. Dates in YYYY-MM-DD.
 
+- 2026-06-22 — Effectiveness/QoL batch: **(5)** students see their **own points &
+  rank** on the waiting/locked screens; teacher shows **📈 Most Improved** (biggest
+  upvote gain vs first attempt) at a redo podium. **(6)** student **"🙋 I'm stuck"**
+  toggle (answer phase) → teacher sees a live count + names in the Run bar
+  (`session.stuck`, cleared on lock-in/next round). **(7)** a "locked-in" **chime**
+  on the student device (audio unlocked by their own tap). **(8)** CSV export now
+  includes the **self-check (✅/🔧)** columns per dimension. **(10)** student
+  **🔠 bigger-text** accessibility toggle (`swift-textsize`). No new top-level paths.
 - 2026-06-22 — Projector now keeps a compact **"scan to join" QR** on the answer
   and voting screens (not just the idle screen), so latecomers can join mid-round.
 - 2026-06-22 — **Bugfix: shared-iPad identity switch.** Per-round student state
