@@ -237,6 +237,7 @@
             width: auto;
             padding: 10px 18px;
         }
+        .upvote-btn.voted { background: linear-gradient(135deg, #34d399, #059669); color: #022c22; }
         .critique-section {
             background: var(--card-2);
             padding: 14px;
@@ -263,7 +264,7 @@
         }
         #idGate .card { width: 360px; max-width: 100%; text-align: center; }
         #idGate select, #idGate input { margin-top: 8px; }
-        #idPin { text-align: center; font-size: 28px; letter-spacing: 12px; }
+        #idPin { display: block; width: 100%; max-width: 170px; margin: 8px auto 0; text-align: center; font-size: 22px; letter-spacing: 8px; }
         .switch-link {
             position: fixed; top: 8px; right: 10px;
             font-size: 13px; color: var(--muted);
@@ -930,7 +931,8 @@
                 ? `Answer #${numOf[post.id]}`
                 : esc(post.name);
 
-            const canVote = phase === 'vote' && !mine && !voted && left > 0;
+            const podium = phase === 'podium';
+            const canAct = phase === 'vote' && !mine && (voted || left > 0);
             const critiquedThis = localStorage.getItem(`swift-crit-${currentRound}-${post.id}`);
             const canCritique = phase === 'vote' && !mine && !critiquedThis && cLeft > 0;
 
@@ -941,12 +943,12 @@
                 ${isModel ? '<div class="model-tag">🏆 MODEL ANSWER — CLASS CHAMPION</div>' : ''}
                 <div class="post-header" onclick="togglePost('${post.id}')">
                     <span class="ph-name"><span class="chev">${open ? '▾' : '▸'}</span>${displayName}${mine ? ' (you)' : ''}</span>
-                    <span class="ph-meta">👍 ${post.upvotes || 0} · 💬 ${critiques.length}</span>
+                    ${podium ? `<span class="ph-meta">👍 ${post.upvotes || 0} · 💬 ${critiques.length}</span>` : ''}
                 </div>
                 <div class="post-body${open ? '' : ' hidden'}">
                     ${renderDims(post)}
-                    <button class="upvote-btn" onclick="upvote('${post.id}')" ${canVote ? '' : 'disabled'}>
-                        👍 ${voted ? 'Upvoted!' : 'Upvote'} (${post.upvotes || 0})
+                    <button class="upvote-btn${voted ? ' voted' : ''}" onclick="upvote('${post.id}')" ${podium ? 'disabled' : (canAct ? '' : 'disabled')}>
+                        ${podium ? `👍 ${post.upvotes || 0}` : (voted ? '✓ Voted — tap to undo' : '👍 Upvote')}
                     </button>`;
 
             if (canCritique) {
@@ -960,7 +962,7 @@
                     </div>`;
             }
 
-            if (critiques.length) {
+            if (podium && critiques.length) {
                 html += `<div class="critiques-list">
                     ${critiques.map(([cid, c]) => `
                         <p>${c.starred ? '<span class="star">⭐</span> ' : ''}<em>${esc(c.by)}:</em><br>
@@ -990,18 +992,26 @@
         }
     }
 
-    // 3 votes per round, max one per post, never your own.
+    // Vote budget per round, max one per post, never your own.
+    // Tapping again removes the vote (toggle) and refunds the budget.
     function upvote(postId) {
         if (postId === myPostId) return;
         if ((session.phase || '') !== 'vote') return;
         const voteKey = `swift-vote-${currentRound}-${postId}`;
-        if (localStorage.getItem(voteKey)) return;
         const left = votesLeft();
-        if (left <= 0) return;
-        localStorage.setItem(voteKey, '1');
-        localStorage.setItem('swift-votesleft-' + currentRound, String(left - 1));
-        db.ref(`posts/${currentRound}/${postId}/upvotes`)
-          .transaction(v => (v || 0) + 1);
+        if (localStorage.getItem(voteKey)) {
+            // un-vote
+            localStorage.removeItem(voteKey);
+            localStorage.setItem('swift-votesleft-' + currentRound, String(left + 1));
+            db.ref(`posts/${currentRound}/${postId}/upvotes`)
+              .transaction(v => Math.max(0, (v || 0) - 1));
+        } else {
+            if (left <= 0) return;
+            localStorage.setItem(voteKey, '1');
+            localStorage.setItem('swift-votesleft-' + currentRound, String(left - 1));
+            db.ref(`posts/${currentRound}/${postId}/upvotes`)
+              .transaction(v => (v || 0) + 1);
+        }
     }
 
     function submitCritique(postId) {

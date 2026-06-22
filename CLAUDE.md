@@ -89,6 +89,7 @@ session/current                     # the one live round, or null when idle
   model          { s,w,i,f,t } | null      # teacher's pre-authored model answer (shown at podium)
   showModel      bool                      # podium debrief: flip the projector to the model answer
   endsAt         epoch ms | null           # countdown end, or null = no timer
+  timerMins      number                    # the round's configured minutes (default 3; used by ↺ Reset)
   paused         bool                      # timer paused (teacher live control)
   pauseLeft      ms                        # remaining time captured while paused
   startedAt      server timestamp
@@ -249,6 +250,17 @@ Ordered roughly by teaching value. Confirm scope with the teacher before buildin
 
 Keep newest first. One line per meaningful change. Dates in YYYY-MM-DD.
 
+- 2026-06-22 — Polish batch: **(a)** timer now **defaults to 3 min** and the Run
+  bar gained a **↺ Reset** button (resets to the round's `timerMins`, default 3).
+  **(b)** Teacher can **🗑 delete a student's answer** from the live feed.
+  **(c)** Student PIN box resized (was oversized). **(d)** During the **vote**
+  phase the student feed **hides peers' vote counts and critiques** (revealed at
+  podium) so voting/feedback stays independent. **(e)** **Un-vote**: tapping an
+  upvoted answer again removes the vote and refunds the budget. **(f)** Podium
+  **validation redesigned**: shows the top 5 answers by votes, each with a
+  place dropdown (🥇 1st +5 / 🥈 2nd +3 / 🥉 3rd +2; top 3 pre-set), instead of
+  one student-picker per slot. **(g)** Projector **model-answer screen now shows
+  the question** above the answer. New `session.timerMins`; no new top-level paths.
 - 2026-06-22 — User-friendliness batch (student + teacher): **(1)** connection
   banner on `index/teacher/projector` — a "🔌 Reconnecting…" bar driven by Firebase
   `.info/connected` (2s debounce) so flaky-wifi drops are obvious. **(2)** live
