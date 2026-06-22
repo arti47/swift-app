@@ -252,9 +252,48 @@
             color: #cbd5e1;
         }
         .star { color: var(--gold); }
+
+        /* Identity gate (pick your name + PIN) */
+        #idGate {
+            position: fixed; inset: 0;
+            background: var(--bg);
+            z-index: 300;
+            display: flex; align-items: center; justify-content: center;
+            padding: 20px;
+        }
+        #idGate .card { width: 360px; max-width: 100%; text-align: center; }
+        #idGate select, #idGate input { margin-top: 8px; }
+        #idPin { text-align: center; font-size: 28px; letter-spacing: 12px; }
+        .switch-link {
+            position: fixed; top: 8px; right: 10px;
+            font-size: 13px; color: var(--muted);
+            background: var(--card); border: 1px solid var(--border);
+            border-radius: 999px; padding: 4px 10px;
+            text-decoration: none; z-index: 60;
+        }
     </style>
 </head>
 <body>
+
+<!-- Identity gate: pick your name from the class roster + a personal PIN, so
+     your points & history follow YOU across any iPad / any day. -->
+<div id="idGate" class="hidden">
+    <div class="card">
+        <h2>👋 Who are you?</h2>
+        <p class="muted" id="idMsg">Pick your name to join.</p>
+        <div id="idStep1">
+            <select id="idNameSel"></select>
+            <input type="text" id="idNameInput" class="hidden" placeholder="Type your name">
+            <button onclick="idContinue()">Continue</button>
+        </div>
+        <div id="idStep2" class="hidden">
+            <input type="password" id="idPin" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="••••">
+            <button onclick="idSubmitPin()">Enter</button>
+            <p style="margin-top:10px;"><a href="#" onclick="idBack();return false;" style="color:var(--primary); font-size:14px;">← pick a different name</a></p>
+        </div>
+    </div>
+</div>
+<a class="switch-link hidden" id="switchLink" href="#" onclick="switchStudent();return false;"></a>
 
 <div class="container">
 
@@ -380,19 +419,130 @@
             document.getElementById(p).classList.toggle('hidden', p !== id));
     }
 
-    // ---- Auto-handle: each device gets a silent persistent identity, so
-    // students never type or pick a name, but podium/scores/review still work.
-    function getStudentName() {
-        let name = localStorage.getItem('swift-name');
-        if (!name) {
-            const animals = ['Falcon','Tiger','Otter','Comet','Maple','Raven','Bolt','Ember',
-                'Koala','Lynx','Orca','Cobra','Husky','Bison','Heron','Panda','Gecko','Moose'];
-            const a = animals[Math.floor(Math.random() * animals.length)];
-            name = a + '-' + Math.floor(100 + Math.random() * 900);
-            localStorage.setItem('swift-name', name);
-        }
-        return name;
+    // ---- Identity: students pick their name from the class roster and unlock
+    // it with a personal 4-digit PIN, so points/history follow the STUDENT (not
+    // the iPad) across days and shared devices. Identity is stored globally at
+    // identities/<nameKey> = { name, pin }. The chosen name is remembered on
+    // this device (one-tap rejoin) but is always re-selectable via "switch".
+    let rosterList = [];
+    let pendingName = null;   // name chosen at step 1, awaiting PIN
+    let pendingMode = null;   // 'create' | 'verify' | 'open'(rules off)
+
+    function getStudentName() { return localStorage.getItem('swift-name'); }
+    function nameKey(name) {
+        return (name || '').trim().toLowerCase().replace(/[.#$\[\]\/]/g, '') || 'anonymous';
     }
+    function identityRefFor(name) { return db.ref('identities/' + nameKey(name)); }
+
+    // One-time migration: clear the old per-device auto-handle so everyone
+    // picks a real identity on the first launch of this version.
+    if (!localStorage.getItem('swift-idv2')) {
+        localStorage.removeItem('swift-name');
+        localStorage.setItem('swift-idv2', '1');
+    }
+
+    db.ref('settings/roster').on('value', s => {
+        rosterList = s.val() || [];
+        refreshIdPicker();
+    });
+
+    function refreshIdPicker() {
+        const sel = document.getElementById('idNameSel');
+        const inp = document.getElementById('idNameInput');
+        if (rosterList.length) {
+            const cur = sel.value;
+            sel.innerHTML = '<option value="">— pick your name —</option>' +
+                rosterList.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+            sel.value = cur;
+            sel.classList.remove('hidden'); inp.classList.add('hidden');
+        } else {
+            sel.classList.add('hidden'); inp.classList.remove('hidden');
+        }
+    }
+
+    function showIdGate() {
+        document.getElementById('idStep2').classList.add('hidden');
+        document.getElementById('idStep1').classList.remove('hidden');
+        document.getElementById('idMsg').textContent = 'Pick your name to join.';
+        refreshIdPicker();
+        document.getElementById('idGate').classList.remove('hidden');
+    }
+    function hideIdGate() { document.getElementById('idGate').classList.add('hidden'); }
+
+    function idContinue() {
+        const name = rosterList.length
+            ? document.getElementById('idNameSel').value
+            : document.getElementById('idNameInput').value.trim();
+        if (!name) { alert('Pick or type your name first.'); return; }
+        pendingName = name;
+        document.getElementById('idPin').value = '';
+        identityRefFor(name).once('value').then(snap => {
+            const rec = snap.val();
+            pendingMode = (rec && rec.pin) ? 'verify' : 'create';
+            document.getElementById('idMsg').textContent = pendingMode === 'verify'
+                ? `Welcome back, ${name}. Enter your 4-digit PIN.`
+                : `Hi ${name}! Create a 4-digit PIN you'll remember.`;
+            gotoPinStep();
+        }).catch(() => {
+            // identities path blocked by rules — let them in without a PIN.
+            pendingMode = 'open';
+            document.getElementById('idMsg').textContent =
+                `Joining as ${name}. (PIN protection is off — ask your teacher.)`;
+            finishIdentity(name);
+        });
+    }
+    function gotoPinStep() {
+        document.getElementById('idStep1').classList.add('hidden');
+        document.getElementById('idStep2').classList.remove('hidden');
+        document.getElementById('idPin').focus();
+    }
+    function idBack() {
+        document.getElementById('idStep2').classList.add('hidden');
+        document.getElementById('idStep1').classList.remove('hidden');
+        document.getElementById('idMsg').textContent = 'Pick your name to join.';
+    }
+    function idSubmitPin() {
+        const pin = document.getElementById('idPin').value;
+        if (!/^\d{4}$/.test(pin)) { alert('PIN must be exactly 4 digits.'); return; }
+        if (pendingMode === 'create') {
+            identityRefFor(pendingName).set({ name: pendingName, pin })
+                .then(() => finishIdentity(pendingName))
+                .catch(() => finishIdentity(pendingName)); // best effort
+        } else {
+            identityRefFor(pendingName).once('value').then(snap => {
+                const rec = snap.val();
+                if (rec && rec.pin === pin) finishIdentity(pendingName);
+                else {
+                    document.getElementById('idMsg').textContent = 'Wrong PIN — try again.';
+                    document.getElementById('idPin').value = '';
+                }
+            });
+        }
+    }
+    function finishIdentity(name) {
+        localStorage.setItem('swift-name', name);
+        pendingName = null; pendingMode = null;
+        hideIdGate();
+        updateSwitchLink();
+        applySession();
+    }
+    function switchStudent() {
+        localStorage.removeItem('swift-name');
+        updateSwitchLink();
+        showIdGate();
+    }
+    function updateSwitchLink() {
+        const link = document.getElementById('switchLink');
+        const name = getStudentName();
+        if (name) { link.textContent = '👤 ' + name + ' — switch'; link.classList.remove('hidden'); }
+        else link.classList.add('hidden');
+    }
+    document.getElementById('idPin').addEventListener('keydown', e => {
+        if (e.key === 'Enter') idSubmitPin();
+    });
+
+    // Require an identity before doing anything else.
+    if (!getStudentName()) showIdGate(); else updateSwitchLink();
 
     // No pasting answers between fields (or from anywhere else),
     // and auto-save a draft on every keystroke so nothing is lost to a
@@ -547,6 +697,7 @@
         btn.disabled = true;
 
         const name = getStudentName();
+        if (!name) { btn.disabled = false; showIdGate(); return; }
 
         // Minimum effort per dimension
         for (const [k, label] of DIMS) {

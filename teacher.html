@@ -440,6 +440,11 @@
                 <strong style="color:#f87171;">⏳ Not yet submitted:</strong>
                 <span id="missingNames"></span>
             </div>
+            <div style="margin-top:12px;">
+                <button class="spot-btn" style="margin:0;" onclick="loadPinList()">🔑 Manage student PINs</button>
+                <p class="muted" style="text-align:left; font-size:13px; margin:6px 0 0;">Students set a personal PIN to claim their name. Reset one here if a student forgets it — they'll set a new PIN next time they log in.</p>
+                <div id="pinList" style="margin-top:8px;"></div>
+            </div>
         </div>
 
         <div class="card">
@@ -714,6 +719,30 @@
         db.ref('settings/activeClass').set({ slot, name });
         db.ref('settings/roster').set(roster);
         document.getElementById('rosterStatus').textContent = '';
+    }
+
+    // ---- Student PINs: students unlock their name with a personal PIN.
+    // Identity lives globally at identities/<nameKey>. Reset one if forgotten.
+    function loadPinList() {
+        const roster = readClassForm().roster;
+        const box = document.getElementById('pinList');
+        if (!roster.length) { box.innerHTML = '<p class="muted" style="text-align:left;">Add roster names first.</p>'; return; }
+        db.ref('identities').once('value').then(snap => {
+            const ids = snap.val() || {};
+            box.innerHTML = roster.map(n => {
+                const has = ids[scoreKey(n)] && ids[scoreKey(n)].pin;
+                return `<div class="lesson-row">
+                    <span style="flex:1;">${esc(n)} — ${has ? '🔒 PIN set' : '— no PIN yet'}</span>
+                    ${has ? `<button class="spot-btn" style="margin:0; border-color:#f87171; color:#f87171;" onclick="resetPin('${esc(n).replace(/'/g, "\\'")}')">Reset PIN</button>` : ''}
+                </div>`;
+            }).join('');
+        }).catch(() => {
+            box.innerHTML = '<p style="color:#f87171; text-align:left;">⚠️ Cannot read identities — add the "identities" path to your Firebase rules.</p>';
+        });
+    }
+    function resetPin(name) {
+        if (!confirm(`Clear ${name}'s PIN? They'll set a new one next time they log in.`)) return;
+        db.ref('identities/' + scoreKey(name)).remove().then(loadPinList);
     }
 
     // ---- Lessons (up to 10 slots × up to 10 questions) ----
