@@ -64,7 +64,7 @@ cleverness.
 |---|---|
 | `index.html` | **Student app.** Phase-aware: waiting → answer form → locked → voting feed → podium/self-compare. Auto-handle identity, draft auto-save, vote/critique budgets. |
 | `teacher.html` | **Teacher console** (private, on the teacher's laptop/iPad). PIN-gated. Split into two tabs: **🎬 Run Lesson** (live: sticky phase-aware control bar with step strip + one highlighted next-step button, counts & timer, push questions ad-hoc or next-in-sequence, validate podium, star critiques, spotlight, live feed, leaderboard) and **🛠 Setup** (classes, lesson builder, QR/join, CSV export, danger zone). Tab choice persists in `localStorage` (`swift-teacher-tab`). |
-| `projector.html` | **Read-only classroom display** (the big screen). Phase-aware, **anonymity-safe** (never shows names during voting), runs the podium reveal + standings, shows spotlighted answers. No PIN. |
+| `projector.html` | **Read-only classroom display** (the big screen). Phase-aware, **anonymity-safe** (never shows names during voting), runs the podium reveal + standings, shows spotlighted answers, and (teacher-triggered at podium) the full-screen model answer for debrief. No PIN. |
 | `review.html` | **Student revision book.** Pick a name/handle → see all past answers, feedback received, and model answers; print/save-as-PDF. |
 | `firebase-config.js` | Firebase project config (shared by all pages). Contains the teacher's real keys. |
 | `CLAUDE.md` | This file. |
@@ -87,6 +87,7 @@ session/current                     # the one live round, or null when idle
   voteLimit      number                    # upvotes allowed per student this round (teacher-set)
   critLimit      number                    # critiques allowed per student this round (teacher-set)
   model          { s,w,i,f,t } | null      # teacher's pre-authored model answer (shown at podium)
+  showModel      bool                      # podium debrief: flip the projector to the model answer
   endsAt         epoch ms | null           # countdown end, or null = no timer
   startedAt      server timestamp
   redoOf         roundId                   # present only on a redo round
@@ -199,8 +200,6 @@ Teacher: `swift-teacher-pin`, `swift-runner-<lessonSlot>` (next-question pointer
 
 Ordered roughly by teaching value. Confirm scope with the teacher before building.
 
-- **Model answer on the projector** — show the crowned answer full-screen during
-  podium for whole-class debrief (currently only on student iPads).
 - **Mark-scheme overlay for "Tally the Marks"** — optional official mark
   allocation attached to a question, revealed at podium (predict → verify).
 - **Spread the critiques** — assign each student a few specific peers to
@@ -241,6 +240,11 @@ Ordered roughly by teaching value. Confirm scope with the teacher before buildin
 
 Keep newest first. One line per meaningful change. Dates in YYYY-MM-DD.
 
+- 2026-06-22 — **Model answer on the projector** for whole-class debrief: at the
+  podium the teacher console shows a **📺 Show Model on Screen** toggle
+  (`session.showModel`) that flips the projector to a full-screen model answer —
+  the teacher's pre-authored one if set, otherwise the crowned Class Champion's
+  answer — and back to the podium standings. (Closes the matching roadmap item.)
 - 2026-06-22 — **Pre-authored teacher model answer** (optional, per lesson
   question): a collapsible 5-dimension "Model answer" section in the Setup
   composer. Carried on `session.model` and stored on `rounds/<id>.model`. At the

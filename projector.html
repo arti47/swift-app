@@ -153,6 +153,12 @@
             What would you <b style="color:var(--gold);">Suggest</b>?</div>
     </div>
 
+    <!-- Model answer for whole-class debrief (teacher-triggered at podium) -->
+    <div id="scrModel" class="hidden">
+        <div class="spot-title" id="modelTitle">🎯 Model Answer</div>
+        <div class="card spot-card" id="modelDims"></div>
+    </div>
+
     <!-- Podium + leaderboard -->
     <div id="podiumScreen" class="hidden">
         <h2>🏆 Round Podium</h2>
@@ -214,7 +220,7 @@
     }
 
     function show(id) {
-        ['scrWait', 'scrAnswer', 'scrVote', 'scrSpot', 'podiumScreen'].forEach(s =>
+        ['scrWait', 'scrAnswer', 'scrVote', 'scrSpot', 'scrModel', 'podiumScreen'].forEach(s =>
             document.getElementById(s).classList.toggle('hidden', s !== id));
     }
 
@@ -285,11 +291,33 @@
         if (phase === 'answer') show('scrAnswer');
         else if (phase === 'vote') show('scrVote');
         else if (phase === 'podium' && session.podium) {
-            show('podiumScreen');
-            if (podiumShownFor !== currentRound) {
-                podiumShownFor = currentRound;
-                runPodiumReveal(session.podium);
+            // Teacher can flip the screen to the model answer for debrief.
+            if (session.showModel) { renderModelScreen(); show('scrModel'); }
+            else {
+                show('podiumScreen');
+                if (podiumShownFor !== currentRound) {
+                    podiumShownFor = currentRound;
+                    runPodiumReveal(session.podium);
+                }
             }
+        }
+    }
+
+    // Prefer the teacher's pre-authored model; fall back to the crowned answer.
+    function renderModelScreen() {
+        const model = (session.model && DIMS.some(([k]) => session.model[k])) ? session.model : null;
+        const champ = session.podium && latestPosts[session.podium.first.id];
+        if (model) {
+            document.getElementById('modelTitle').textContent = "🎯 Teacher's Model Answer";
+            document.getElementById('modelDims').innerHTML = renderDims(model);
+        } else if (champ) {
+            document.getElementById('modelTitle').textContent =
+                '🏆 Model Answer — ' + esc(champ.name);
+            document.getElementById('modelDims').innerHTML = renderDims(champ);
+        } else {
+            document.getElementById('modelTitle').textContent = '🎯 Model Answer';
+            document.getElementById('modelDims').innerHTML =
+                '<p style="text-align:center;">No model answer set for this question.</p>';
         }
     }
 

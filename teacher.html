@@ -129,6 +129,7 @@
             font-size: 19px; padding: 16px 28px;
             box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.35);
         }
+        #modelProjBtn.on { background: linear-gradient(135deg, #fbbf24, #d97706); color: #451a03; }
         .ghost-danger { background: none; border: 1px solid #f87171; color: #f87171; }
         .phase-hint { text-align: center; color: var(--muted); font-size: 14px; margin-top: 12px; }
 
@@ -338,6 +339,7 @@
                 <button id="openVotingBtn" class="greenbtn hidden" onclick="openVoting()">🗳 Open Voting</button>
                 <button id="podiumBtn" class="goldbtn hidden" onclick="showValidation()">🏆 Validate Top 3</button>
                 <button id="redoBtn" class="greenbtn hidden" onclick="pushRedo()">🔄 Redo Round</button>
+                <button id="modelProjBtn" class="hidden" onclick="toggleModelProjector()">📺 Show Model on Screen</button>
                 <button id="replayBtn" class="goldbtn hidden" onclick="replayPodium()">🎬 Replay Podium</button>
                 <button id="clearBoardBtn" class="ghost-danger hidden" onclick="clearBoard()">🧹 End Round</button>
             </div>
@@ -1212,6 +1214,12 @@
         db.ref('session/current/spotlight').set(cur === postId ? null : postId);
     }
 
+    // ---- Flip the projector to the model answer (podium debrief) ----
+    function toggleModelProjector() {
+        const cur = sessionData && sessionData.showModel;
+        db.ref('session/current/showModel').set(!cur);
+    }
+
     function clearBoard() {
         if (!typeConfirm('END', 'End the round? Student screens go back to "waiting". (Scores are kept.)')) return;
         db.ref('session/current').remove();
@@ -1376,6 +1384,15 @@
         document.getElementById('clearBoardBtn').classList.toggle('hidden', phase == null);
         document.getElementById('replayBtn').classList.toggle('hidden',
             !(sessionData && sessionData.podium));
+
+        // Model-on-projector toggle: only at podium
+        const mp = document.getElementById('modelProjBtn');
+        mp.classList.toggle('hidden', phase !== 'podium');
+        if (phase === 'podium') {
+            const on = !!(sessionData && sessionData.showModel);
+            mp.textContent = on ? '📺 Hide Model — back to Podium' : '📺 Show Model on Screen';
+            mp.classList.toggle('on', on);
+        }
 
         // Highlight the single "next step" button for the current phase
         const nextStepBtn = { answer: ov, vote: pb, podium: rb }[phase];
