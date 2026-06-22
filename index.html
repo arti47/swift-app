@@ -278,6 +278,32 @@
             text-align: center; font-weight: bold;
             padding: 8px; font-size: 15px; z-index: 250;
         }
+        .a11y-link {
+            position: fixed; top: 8px; left: 10px;
+            font-size: 13px; color: var(--muted);
+            background: var(--card); border: 1px solid var(--border);
+            border-radius: 999px; padding: 4px 10px; z-index: 60;
+            width: auto; margin: 0; font-weight: normal; cursor: pointer;
+        }
+        .my-standing { margin-top: 16px; font-size: 18px; font-weight: bold; color: var(--primary); }
+        .assign-banner {
+            background: #1e293b; border: 1px solid var(--primary);
+            color: var(--primary); font-weight: bold;
+            padding: 12px 16px; border-radius: 12px; margin-bottom: 14px; text-align: center;
+        }
+        .post.assigned { border-left-color: var(--primary); box-shadow: 0 0 0 2px rgba(56,189,248,0.35); }
+        .assign-tag { color: var(--primary); font-weight: bold; font-size: 13px; letter-spacing: 1px; margin-bottom: 6px; }
+        .stuck-btn {
+            width: auto; margin: 0; padding: 8px 16px; font-size: 15px;
+            background: var(--card-2); border: 1px solid var(--border); color: var(--muted);
+        }
+        .stuck-btn.on { background: linear-gradient(135deg, #fb923c, #c2410c); color: #fff; border-color: #c2410c; }
+        /* Bigger-text accessibility mode */
+        body.big-text { font-size: 19px; }
+        body.big-text textarea, body.big-text input[type=text], body.big-text select,
+        body.big-text button { font-size: 19px; }
+        body.big-text .dimension, body.big-text .ph-name, body.big-text .cmp-row { font-size: 19px; }
+        body.big-text .question-banner { font-size: 21px; }
         .charcount { font-size: 12px; color: var(--muted); text-align: right; margin-top: 3px; }
         .charcount.ok { color: var(--green); }
         .form-hint { text-align: center; color: var(--muted); font-size: 13px; margin-top: 8px; }
@@ -305,6 +331,7 @@
     </div>
 </div>
 <a class="switch-link hidden" id="switchLink" href="#" onclick="switchStudent();return false;"></a>
+<button class="a11y-link" id="a11yBtn" onclick="toggleTextSize()">🔠 Bigger text</button>
 <div id="connBanner" class="conn-banner hidden">🔌 Reconnecting… your work is saved on this device.</div>
 
 <div class="container">
@@ -316,6 +343,7 @@
             <span class="emoji">🎬</span>
             <div class="headline">Get ready…</div>
             <div class="sub">Waiting for your teacher to launch a question.</div>
+            <div class="my-standing" id="myStanding0"></div>
             <p style="margin-top:24px;"><a href="review.html" style="color:var(--primary); font-size:15px;">📖 My Revision Book — see all your past answers & feedback</a></p>
         </div>
     </div>
@@ -325,6 +353,9 @@
         <h1>S.W.I.F.T. <span class="spark">Arena</span></h1>
         <div id="timerBar"></div>
         <div class="question-banner" id="questionText1"></div>
+        <div style="text-align:center; margin-bottom:12px;">
+            <button type="button" id="stuckBtn" class="stuck-btn" onclick="toggleStuck()">🙋 I'm stuck</button>
+        </div>
         <div class="card hidden question-image" id="questionImageWrap1">
             <img id="questionImage1" alt="Question image">
         </div>
@@ -372,12 +403,14 @@
             <div class="headline">Answer locked in!</div>
             <div class="bigcount" id="lockedCount">1</div>
             <div class="sub">answers in so far. Voting opens when your teacher says so…</div>
+            <div class="my-standing" id="myStandingL"></div>
         </div>
     </div>
 
     <!-- Voting / podium phase -->
     <div id="phase2" class="hidden">
         <h2 id="feedTitle">🗳 Vote for the Best Answers</h2>
+        <div class="assign-banner hidden" id="assignBanner"></div>
         <div class="question-banner" id="questionText2"></div>
         <div class="card hidden question-image" id="questionImageWrap2">
             <img id="questionImage2" alt="Question image">
@@ -577,6 +610,82 @@
     // Require an identity before doing anything else.
     if (!getStudentName()) showIdGate(); else updateSwitchLink();
 
+    // ---- Accessibility: bigger-text mode (remembered on this device) ----
+    function applyTextSize() {
+        const big = localStorage.getItem('swift-textsize') === 'big';
+        document.body.classList.toggle('big-text', big);
+        const b = document.getElementById('a11yBtn');
+        if (b) b.textContent = big ? '🔠 Normal text' : '🔠 Bigger text';
+    }
+    function toggleTextSize() {
+        const big = localStorage.getItem('swift-textsize') === 'big';
+        localStorage.setItem('swift-textsize', big ? 'normal' : 'big');
+        applyTextSize();
+    }
+    applyTextSize();
+
+    // ---- "I'm stuck" signal (teacher sees it; stored under the live round) ----
+    function toggleStuck() {
+        if (!currentRound) return;
+        const key = meKey();
+        const ref = db.ref('session/current/stuck/' + key);
+        const on = session && session.stuck && session.stuck[key];
+        if (on) ref.remove(); else ref.set(getStudentName() || 'someone');
+    }
+    function renderStuck() {
+        const btn = document.getElementById('stuckBtn');
+        if (!btn) return;
+        const on = session && session.stuck && session.stuck[meKey()];
+        btn.classList.toggle('on', !!on);
+        btn.textContent = on ? "🙋 Stuck — teacher notified (tap to clear)" : '🙋 I\'m stuck';
+    }
+
+    // ---- Personal standing: this student's points & rank in the class ----
+    let myScoresRef = null;
+    db.ref('settings/activeClass').on('value', s => {
+        const ac = s.val();
+        const path = 'scores/' + (ac && ac.slot ? 'c' + ac.slot : 'default');
+        if (myScoresRef) myScoresRef.off();
+        myScoresRef = db.ref(path);
+        myScoresRef.on('value', renderStanding);
+    });
+    function renderStanding(snap) {
+        const scores = Object.values((snap && snap.val()) || {})
+            .sort((a, b) => b.points - a.points);
+        const me = meKey();
+        const idx = scores.findIndex(s => (s.name || '').trim().toLowerCase()
+            .replace(/[.#$\[\]\/]/g, '') === me);
+        let txt = '';
+        if (idx >= 0) {
+            const ord = n => { const s = ['th','st','nd','rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); };
+            txt = `🏅 You: ${scores[idx].points} pts · ${ord(idx + 1)} of ${scores.length}`;
+        }
+        ['myStanding0', 'myStandingL'].forEach(id => {
+            const el = document.getElementById(id); if (el) el.textContent = txt;
+        });
+    }
+
+    // ---- Sound cue on lock-in (audio unlocked by the student's own tap) ----
+    let audioCtx = null;
+    function ensureAudio() {
+        try {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        } catch (_) {}
+    }
+    function beep(freq, ms) {
+        try {
+            ensureAudio();
+            if (!audioCtx) return;
+            const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+            o.frequency.value = freq; o.type = 'sine';
+            o.connect(g); g.connect(audioCtx.destination);
+            g.gain.setValueAtTime(0.18, audioCtx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + ms / 1000);
+            o.start(); o.stop(audioCtx.currentTime + ms / 1000);
+        } catch (_) {}
+    }
+
     // ---- Connection banner: reassure students if Firebase drops ----
     let connTimer = null;
     db.ref('.info/connected').on('value', s => {
@@ -663,6 +772,7 @@
             }
         });
         startTimer(session);
+        renderStuck();
         updateScreen();
     }
 
@@ -771,6 +881,7 @@
         e.preventDefault();
         const btn = document.getElementById('submitBtn');
         btn.disabled = true;
+        ensureAudio(); // unlock sound within this tap gesture
 
         const name = getStudentName();
         if (!name) { btn.disabled = false; showIdGate(); return; }
@@ -804,6 +915,8 @@
                 myPostId = ref.key;
                 localStorage.setItem(postKeyFor(currentRound), myPostId);
                 localStorage.removeItem(draftKey()); // locked in — draft no longer needed
+                db.ref('session/current/stuck/' + meKey()).remove(); // no longer stuck
+                beep(880, 160); // "locked in" chime
                 updateScreen();
                 window.scrollTo(0, 0);
             })
@@ -911,6 +1024,12 @@
         const numOf = {};
         bySubmit.forEach((p, i) => numOf[p.id] = i + 1);
 
+        // Directed critiques: the specific peers this student must critique
+        // (null = no assignment set for this round → open critiquing).
+        const myAssigned = (session.assignments)
+            ? (session.assignments[meKey()] || []) : null;
+        const assignedSet = myAssigned ? new Set(myAssigned) : null;
+
         let posts = [...bySubmit];
         if (phase === 'podium') {
             posts.sort((a, b) => (b.upvotes || 0) - (a.upvotes || 0));
@@ -918,9 +1037,21 @@
             const wIdx = posts.findIndex(p => p.id === winnerId);
             if (wIdx > 0) posts.unshift(posts.splice(wIdx, 1)[0]);
         } else {
-            // Own post pinned first during voting
-            const mineIdx = posts.findIndex(p => p.id === myPostId);
-            if (mineIdx > 0) posts.unshift(posts.splice(mineIdx, 1)[0]);
+            // Voting: own post first, then the answers assigned to me, then the rest
+            posts.sort((a, b) => {
+                const rank = p => p.id === myPostId ? 0 : (assignedSet && assignedSet.has(p.id) ? 1 : 2);
+                return rank(a) - rank(b);
+            });
+        }
+
+        // Banner telling the student which answers to critique
+        const ab = document.getElementById('assignBanner');
+        if (phase === 'vote' && assignedSet && assignedSet.size) {
+            const nums = [...assignedSet].map(id => '#' + numOf[id]).filter(n => n !== '#undefined');
+            ab.textContent = `📋 You've been asked to critique ${nums.join(', ')} — they're at the top.`;
+            ab.classList.remove('hidden');
+        } else {
+            ab.classList.add('hidden');
         }
 
         document.getElementById('feedCount').textContent =
@@ -949,12 +1080,17 @@
             const podium = phase === 'podium';
             const canAct = phase === 'vote' && !mine && (voted || left > 0);
             const critiquedThis = localStorage.getItem(critKeyFor(post.id));
-            const canCritique = phase === 'vote' && !mine && !critiquedThis && cLeft > 0;
+            const isAssigned = assignedSet ? assignedSet.has(post.id) : false;
+            // Restricted: if assignments exist, you may only critique your assigned peers.
+            const allowedToCritique = assignedSet ? isAssigned : true;
+            const canCritique = phase === 'vote' && !mine && !critiquedThis && cLeft > 0 && allowedToCritique;
 
             const postEl = document.createElement('div');
-            postEl.className = 'card post' + (mine ? ' mine' : '') + (isModel ? ' model' : '');
+            postEl.className = 'card post' + (mine ? ' mine' : '') + (isModel ? ' model' : '')
+                + (phase === 'vote' && isAssigned ? ' assigned' : '');
 
             let html = `
+                ${phase === 'vote' && isAssigned ? '<div class="assign-tag">📋 Critique this one</div>' : ''}
                 ${isModel ? '<div class="model-tag">🏆 MODEL ANSWER — CLASS CHAMPION</div>' : ''}
                 <div class="post-header" onclick="togglePost('${post.id}')">
                     <span class="ph-name"><span class="chev">${open ? '▾' : '▸'}</span>${displayName}${mine ? ' (you)' : ''}</span>
