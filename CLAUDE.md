@@ -28,7 +28,7 @@ real-time, no-login "arena" designed to keep easily-distracted students engaged.
 **The lesson loop (per question / "round"):**
 1. **Answer** — teacher pushes a question; students fill the 5 fields and "lock in". No one sees peers yet.
 2. **Vote** — teacher opens voting; answers appear **anonymously** ("Answer #N"); students upvote (budget) and give Affirm-Clarify-Suggest critiques (budget).
-3. **Podium** — teacher validates the top 3 by votes (can swap), points are awarded (5/3/2), names revealed, winner crowned "Model Answer"; students self-compare to the model.
+3. **Podium** — teacher validates the top 3 by votes (can swap), points are awarded (5/3/2), names revealed, winner crowned "Class Champion"; students self-compare against the champion and, if the teacher pre-authored one for that question, the **teacher's model answer** shown alongside.
 A session = many rounds. The teacher can run questions ad-hoc or from a saved **lesson**, for any of several saved **classes**.
 
 **Audience/author:** a teacher (non-developer). Keep everything no-login,
@@ -64,7 +64,7 @@ cleverness.
 |---|---|
 | `index.html` | **Student app.** Phase-aware: waiting → answer form → locked → voting feed → podium/self-compare. Auto-handle identity, draft auto-save, vote/critique budgets. |
 | `teacher.html` | **Teacher console** (private, on the teacher's laptop/iPad). PIN-gated. Split into two tabs: **🎬 Run Lesson** (live: sticky phase-aware control bar with step strip + one highlighted next-step button, counts & timer, push questions ad-hoc or next-in-sequence, validate podium, star critiques, spotlight, live feed, leaderboard) and **🛠 Setup** (classes, lesson builder, QR/join, CSV export, danger zone). Tab choice persists in `localStorage` (`swift-teacher-tab`). |
-| `projector.html` | **Read-only classroom display** (the big screen). Phase-aware, **anonymity-safe** (never shows names during voting), runs the podium reveal + standings, shows spotlighted answers. No PIN. |
+| `projector.html` | **Read-only classroom display** (the big screen). Phase-aware, **anonymity-safe** (never shows names during voting), runs the podium reveal + standings, shows spotlighted answers, and (teacher-triggered at podium) the full-screen model answer for debrief. No PIN. |
 | `review.html` | **Student revision book.** Pick a name/handle → see all past answers, feedback received, and model answers; print/save-as-PDF. |
 | `firebase-config.js` | Firebase project config (shared by all pages). Contains the teacher's real keys. |
 | `CLAUDE.md` | This file. |
@@ -86,6 +86,8 @@ session/current                     # the one live round, or null when idle
   phase          "answer" | "vote" | "podium"
   voteLimit      number                    # upvotes allowed per student this round (teacher-set)
   critLimit      number                    # critiques allowed per student this round (teacher-set)
+  model          { s,w,i,f,t } | null      # teacher's pre-authored model answer (shown at podium)
+  showModel      bool                      # podium debrief: flip the projector to the model answer
   endsAt         epoch ms | null           # countdown end, or null = no timer
   startedAt      server timestamp
   redoOf         roundId                   # present only on a redo round
@@ -103,6 +105,7 @@ posts/<roundId>/<pushId>            # one student submission
 rounds/<roundId>                    # permanent record (survives session changes)
   question       string             # prefixed "(Redo) " for redo rounds
   hadImage       bool
+  model          { s,w,i,f,t } | null  # teacher's pre-authored model answer (for review.html)
   redoOf         roundId            # optional
   awarded        true               # set once podium points are given (guards double-award)
   podium         { first|second|third: {id, name} }   # permanent copy for review.html
@@ -120,7 +123,8 @@ classes/<1..6>                      # up to 6 saved classes
   { name, roster: [names] }
 
 lessons/<1..10>                     # up to 10 saved lessons
-  { name, questions: [ {q, image, mins, vote, crit}, ... up to 10 ] }
+  { name, questions: [ {q, image, mins, vote, crit, model}, ... up to 10 ] }
+    #   model = { s,w,i,f,t } | null  (teacher's pre-authored model answer)
 ```
 
 **Identity model:** students no longer type a name. Each device generates a
@@ -196,8 +200,6 @@ Teacher: `swift-teacher-pin`, `swift-runner-<lessonSlot>` (next-question pointer
 
 Ordered roughly by teaching value. Confirm scope with the teacher before building.
 
-- **Model answer on the projector** — show the crowned answer full-screen during
-  podium for whole-class debrief (currently only on student iPads).
 - **Mark-scheme overlay for "Tally the Marks"** — optional official mark
   allocation attached to a question, revealed at podium (predict → verify).
 - **Spread the critiques** — assign each student a few specific peers to
@@ -238,6 +240,24 @@ Ordered roughly by teaching value. Confirm scope with the teacher before buildin
 
 Keep newest first. One line per meaningful change. Dates in YYYY-MM-DD.
 
+- 2026-06-22 — Teacher live feed reading-load controls: critiques are now
+  **collapsed by default** behind a per-answer "💬 N critiques — show" toggle, and
+  the feed shows only the **top 8 answers by votes** with a "Show all N" switch.
+  Cuts the wall of text during a live lesson; voting order does the triage.
+- 2026-06-22 — **Model answer on the projector** for whole-class debrief: at the
+  podium the teacher console shows a **📺 Show Model on Screen** toggle
+  (`session.showModel`) that flips the projector to a full-screen model answer —
+  the teacher's pre-authored one if set, otherwise the crowned Class Champion's
+  answer — and back to the podium standings. (Closes the matching roadmap item.)
+- 2026-06-22 — **Pre-authored teacher model answer** (optional, per lesson
+  question): a collapsible 5-dimension "Model answer" section in the Setup
+  composer. Carried on `session.model` and stored on `rounds/<id>.model`. At the
+  podium the student compare panel now shows the **🎯 teacher's model** alongside
+  the **🏆 top peer** (class champion) and the student's own answer; the Revision
+  Book (`review.html`) shows the teacher's model per question too. The crowned
+  peer answer is now called the "Class Champion" to distinguish it from the
+  teacher's model. Ad-hoc Run-tab questions have no pre-authored model. No new
+  Firebase paths (nested under existing session/rounds/lessons).
 - 2026-06-22 — Run tab now lists the selected lesson's questions inline:
   tap one to select, then **🚀 Push Selected**, or **▶ Push Next in Sequence**
   (no need to leave for the Setup tab). **Vote budget is now teacher-set per

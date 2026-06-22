@@ -123,6 +123,7 @@
             vertical-align: middle;
         }
         .cmp-tag.model { background: var(--gold); color: #451a03; }
+        .cmp-tag.champ { background: var(--primary); color: #082f49; }
         .cmp-tag.mine { background: var(--green); color: #022c22; }
         .cmp-btns { margin-top: 8px; display: flex; gap: 8px; }
         .cmp-btn {
@@ -619,11 +620,17 @@
 
     function renderCompare(winnerId) {
         const box = document.getElementById('compareContainer');
-        const model = latestPosts[winnerId];
+        const champion = latestPosts[winnerId];
         const mine = latestPosts[myPostId];
-        if (!model || !mine) { box.innerHTML = ''; return; }
+        if (!mine) { box.innerHTML = ''; return; }
 
-        if (winnerId === myPostId) {
+        // The teacher's pre-authored ideal answer for this question, if any.
+        const teacherModel = (session.model && DIMS.some(([k]) => session.model[k]))
+            ? session.model : null;
+        const iAmChampion = winnerId === myPostId;
+
+        // If you won AND there's no teacher model to measure against, just celebrate.
+        if (iAmChampion && !teacherModel) {
             box.innerHTML = `<div class="card" style="border:2px solid var(--gold); text-align:center;">
                 <strong style="color:var(--gold); font-size:18px;">🏆 YOUR answer is the Model Answer — take a bow!</strong>
             </div>`;
@@ -631,13 +638,18 @@
         }
 
         const checks = mine.selfcheck || {};
+        const youWonNote = iAmChampion
+            ? `<p style="color:var(--gold); font-weight:bold; margin:6px 0 0;">🏆 Your answer was the class champion! Now see how it stacks up against the teacher's model.</p>`
+            : '';
         box.innerHTML = `<div class="card">
-            <strong>🪞 Compare with the Model Answer</strong>
+            <strong>🪞 Compare your answer</strong>
             <p style="color:var(--muted); font-size:14px; margin:6px 0 0;">For each part: is yours as good as the model, or does it need work? Be honest — this is for you.</p>
+            ${youWonNote}
             ${DIMS.map(([k, label]) => `
                 <div class="cmp-dim">
                     <div class="cmp-label d-${k}">${label}</div>
-                    <div class="cmp-row"><span class="cmp-tag model">MODEL</span>${esc(model[k])}</div>
+                    ${teacherModel && teacherModel[k] ? `<div class="cmp-row"><span class="cmp-tag model">🎯 TEACHER'S MODEL</span>${esc(teacherModel[k])}</div>` : ''}
+                    ${(champion && !iAmChampion) ? `<div class="cmp-row"><span class="cmp-tag champ">🏆 TOP PEER</span>${esc(champion[k])}</div>` : ''}
                     <div class="cmp-row"><span class="cmp-tag mine">MINE</span>${esc(mine[k])}</div>
                     <div class="cmp-btns">
                         <button class="cmp-btn ok${checks[k] === 'ok' ? ' sel' : ''}" onclick="selfCheck('${k}','ok')">✅ Mine is as good</button>
