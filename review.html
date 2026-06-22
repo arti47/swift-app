@@ -221,13 +221,19 @@
                     }
                 }
 
+                // The teacher's pre-authored model answer for this question, if any.
+                let teacherModelHtml = '';
+                if (meta.model && DIMS.some(([k]) => meta.model[k])) {
+                    teacherModelHtml = `<span class="section-tag tag-model">🎯 TEACHER'S MODEL ANSWER</span>
+                        ${renderDims(meta.model)}`;
+                }
+
                 let modelHtml = '';
                 if (podium && podium.first) {
                     if (podium.first.id === myId) {
-                        modelHtml = `<span class="section-tag tag-model">MODEL ANSWER</span>
-                            <p class="winbanner">🏆 YOUR answer was crowned the model answer!</p>`;
+                        modelHtml = `<p class="winbanner">🏆 YOUR answer was the class champion!</p>`;
                     } else if (posts[podium.first.id]) {
-                        modelHtml = `<span class="section-tag tag-model">MODEL ANSWER (by ${esc(podium.first.name)})</span>
+                        modelHtml = `<span class="section-tag tag-model">🏆 CLASS CHAMPION (by ${esc(podium.first.name)})</span>
                             ${renderDims(posts[podium.first.id])}`;
                     }
                 }
@@ -242,6 +248,7 @@
                     ${crits.length ? `<span class="section-tag tag-fb">FEEDBACK I RECEIVED</span>
                         ${crits.map(c => `<div class="crit">${c.starred ? '<span class="star">⭐</span> ' : ''}<em>${esc(c.by)}:</em>
                             <b>A:</b> ${esc(c.affirm)} · <b>C:</b> ${esc(c.clarify)} · <b>S:</b> ${esc(c.suggest)}</div>`).join('')}` : ''}
+                    ${teacherModelHtml}
                     ${modelHtml}
                 </div>`);
             });

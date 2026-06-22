@@ -468,6 +468,27 @@
             <input type="number" id="qVoteLimit" min="0" max="10" value="2">
             <label for="qCritLimit">Critiques per student this round</label>
             <input type="number" id="qCritLimit" min="0" max="10" value="3">
+
+            <div style="margin-top:16px;">
+                <div class="collapse-head" onclick="toggleModel()">
+                    <h2 style="font-size:16px;">🎯 Model answer (optional — revealed at the podium)</h2>
+                    <span class="chev" id="modelChevron">▸</span>
+                </div>
+                <div id="modelBody" class="hidden" style="margin-top:6px;">
+                    <p class="muted" style="text-align:left; margin:0 0 8px;">Write your ideal answer. At the podium it's shown beside the class champion so students can compare against both. Leave blank to skip.</p>
+                    <label for="mdlS">S — Number of Setups</label>
+                    <textarea id="mdlS" placeholder="Your model answer for S…"></textarea>
+                    <label for="mdlW">W — Command Word</label>
+                    <textarea id="mdlW" placeholder="Your model answer for W…"></textarea>
+                    <label for="mdlI">I — Idea of Science</label>
+                    <textarea id="mdlI" placeholder="Your model answer for I…"></textarea>
+                    <label for="mdlF">F — Facts / Data</label>
+                    <textarea id="mdlF" placeholder="Your model answer for F…"></textarea>
+                    <label for="mdlT">T — Tally the Marks</label>
+                    <textarea id="mdlT" placeholder="Your model answer for T…"></textarea>
+                </div>
+            </div>
+
             <div class="controls-row">
                 <button id="addLessonBtn" class="goldbtn" onclick="addToLesson()">➕ Add to Lesson</button>
                 <button id="cancelEditBtn" class="danger hidden" onclick="cancelEditQ()">✕ Cancel Edit</button>
@@ -770,7 +791,8 @@
             image: questionImage || null,
             mins: mins > 0 ? mins : null,
             vote: isNaN(vote) ? 2 : vote,
-            crit: isNaN(crit) ? 3 : crit
+            crit: isNaN(crit) ? 3 : crit,
+            model: readModelForm()
         };
 
         if (editingQ !== null) {
@@ -791,10 +813,41 @@
         document.getElementById('qMinutes').value = '';
         document.getElementById('qVoteLimit').value = '2';
         document.getElementById('qCritLimit').value = '3';
+        setModelForm(null);
+        collapseModel();
         removeImage();
         editingQ = null;
         document.getElementById('addLessonBtn').textContent = '➕ Add to Lesson';
         document.getElementById('cancelEditBtn').classList.add('hidden');
+    }
+
+    // ---- Optional pre-authored model answer (per lesson question) ----
+    function toggleModel() {
+        const body = document.getElementById('modelBody');
+        const hidden = body.classList.toggle('hidden');
+        document.getElementById('modelChevron').textContent = hidden ? '▸' : '▾';
+    }
+    function collapseModel() {
+        document.getElementById('modelBody').classList.add('hidden');
+        document.getElementById('modelChevron').textContent = '▸';
+    }
+    function expandModel() {
+        document.getElementById('modelBody').classList.remove('hidden');
+        document.getElementById('modelChevron').textContent = '▾';
+    }
+    // Returns {s,w,i,f,t} if any dimension was filled in, else null.
+    function readModelForm() {
+        const m = {}; let any = false;
+        DIMS.forEach(([k]) => {
+            const v = document.getElementById('mdl' + k.toUpperCase()).value.trim();
+            m[k] = v;
+            if (v) any = true;
+        });
+        return any ? m : null;
+    }
+    function setModelForm(model) {
+        DIMS.forEach(([k]) =>
+            document.getElementById('mdl' + k.toUpperCase()).value = (model && model[k]) || '');
     }
 
     function editQ(i) {
@@ -804,6 +857,8 @@
         document.getElementById('qMinutes').value = ql.mins || '';
         document.getElementById('qVoteLimit').value = ql.vote != null ? ql.vote : 2;
         document.getElementById('qCritLimit').value = ql.crit != null ? ql.crit : 3;
+        setModelForm(ql.model);
+        if (ql.model) expandModel(); else collapseModel();
         if (ql.image) {
             questionImage = ql.image;
             document.getElementById('imgPreview').src = ql.image;
@@ -889,12 +944,14 @@
             phase: 'answer',
             voteLimit: ql.vote != null ? ql.vote : 2,
             critLimit: ql.crit != null ? ql.crit : 3,
+            model: ql.model || null,
             endsAt: ql.mins > 0 ? Date.now() + ql.mins * 60000 : null,
             startedAt: firebase.database.ServerValue.TIMESTAMP
         });
         db.ref('rounds/' + roundId).set({
             question: ql.q,
             hadImage: !!ql.image,
+            model: ql.model || null,
             startedAt: firebase.database.ServerValue.TIMESTAMP
         });
         localStorage.setItem(nextIdxKey(slot), String(i + 1));
@@ -923,7 +980,7 @@
                 <span class="drag-handle" title="Drag to reorder">⠿</span>
                 <span style="flex:1;">${i < next ? '✅ ' : ''}<strong>Q${i + 1}.</strong>
                     ${esc((ql.q || '').slice(0, 80))}${(ql.q || '').length > 80 ? '…' : ''}
-                    ${ql.image ? ' 🖼' : ''}${ql.mins ? ' ⏱' + ql.mins + 'm' : ''} 🗳${ql.vote != null ? ql.vote : 2} 💬${ql.crit != null ? ql.crit : 3}</span>
+                    ${ql.image ? ' 🖼' : ''}${ql.mins ? ' ⏱' + ql.mins + 'm' : ''} 🗳${ql.vote != null ? ql.vote : 2} 💬${ql.crit != null ? ql.crit : 3}${ql.model ? ' 🎯' : ''}</span>
                 <button class="spot-btn" style="margin:0;" onclick="editQ(${i})">✏️ Edit</button>
                 <button class="spot-btn" style="margin:0;" onclick="moveQ(${i}, -1)" ${i === 0 ? 'disabled' : ''}>↑</button>
                 <button class="spot-btn" style="margin:0;" onclick="moveQ(${i}, 1)" ${i === qs.length - 1 ? 'disabled' : ''}>↓</button>
@@ -955,7 +1012,7 @@
                  style="cursor:pointer;" onclick="selectRunQ(${i})">
                 <span style="flex:1;">${i === selectedRunQ ? '🎯 ' : ''}${i < next ? '✅ ' : ''}<strong>Q${i + 1}.</strong>
                     ${esc((ql.q || '').slice(0, 70))}${(ql.q || '').length > 70 ? '…' : ''}
-                    ${ql.image ? ' 🖼' : ''}${ql.mins ? ' ⏱' + ql.mins + 'm' : ''} 🗳${ql.vote != null ? ql.vote : 2} 💬${ql.crit != null ? ql.crit : 3}</span>
+                    ${ql.image ? ' 🖼' : ''}${ql.mins ? ' ⏱' + ql.mins + 'm' : ''} 🗳${ql.vote != null ? ql.vote : 2} 💬${ql.crit != null ? ql.crit : 3}${ql.model ? ' 🎯' : ''}</span>
             </div>`).join('') +
             `<button class="greenbtn" style="width:100%;" onclick="pushSelectedRun()" ${selectedRunQ === null ? 'disabled' : ''}>
                 🚀 ${selectedRunQ === null ? 'Tap a question above to select it' : 'Push Selected — Q' + (selectedRunQ + 1)}
@@ -1097,6 +1154,7 @@
             phase: 'answer',
             voteLimit: isNaN(voteLimit) ? 2 : voteLimit,
             critLimit: isNaN(critLimit) ? 3 : critLimit,
+            model: null,
             endsAt: mins > 0 ? Date.now() + mins * 60000 : null,
             startedAt: firebase.database.ServerValue.TIMESTAMP
         });
@@ -1134,6 +1192,7 @@
             phase: 'answer',
             voteLimit: sessionData.voteLimit != null ? sessionData.voteLimit : 2,
             critLimit: sessionData.critLimit != null ? sessionData.critLimit : 3,
+            model: sessionData.model || null,
             endsAt: null,
             redoOf: origin,
             startedAt: firebase.database.ServerValue.TIMESTAMP
@@ -1141,6 +1200,7 @@
         db.ref('rounds/' + roundId).set({
             question: '(Redo) ' + sessionData.question,
             hadImage: !!sessionData.image,
+            model: sessionData.model || null,
             redoOf: origin,
             startedAt: firebase.database.ServerValue.TIMESTAMP
         });
