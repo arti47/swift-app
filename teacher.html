@@ -81,24 +81,65 @@
         .greenbtn { background: linear-gradient(135deg, #34d399, #059669); }
         .controls-row { display: flex; gap: 10px; flex-wrap: wrap; }
 
-        .phase-pill {
-            text-align: center;
-            font-size: 18px;
-            font-weight: bold;
-            padding: 8px;
-            border-radius: 999px;
-            background: var(--card-2);
+        /* ---- Tabs ---- */
+        .tabbar { display: flex; gap: 8px; justify-content: center; margin-bottom: 18px; }
+        .tabbar button {
+            flex: 1; max-width: 260px; margin: 0;
+            background: var(--card-2); color: var(--muted);
             border: 1px solid var(--border);
-            margin-bottom: 16px;
+        }
+        .tabbar button.active {
+            background: linear-gradient(135deg, #38bdf8, #2563eb);
+            color: #fff; border-color: var(--primary);
         }
 
-        .statbar { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; }
-        .stat { text-align: center; padding: 8px 26px; }
-        .stat .num { font-size: 52px; font-weight: bold; color: var(--primary); }
-        .stat .lbl { font-size: 13px; color: var(--muted); text-transform: uppercase; }
-        #timerBig { font-size: 52px; font-weight: bold; color: var(--primary); }
+        /* ---- Sticky run control/status bar ---- */
+        .runbar {
+            position: sticky; top: 0; z-index: 50;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 14px 16px;
+            margin-bottom: 16px;
+            box-shadow: 0 8px 18px -8px rgba(0, 0, 0, 0.7);
+        }
+        .step-strip {
+            display: flex; align-items: center; justify-content: center;
+            gap: 8px; flex-wrap: wrap; margin-bottom: 12px;
+        }
+        .step {
+            padding: 5px 14px; border-radius: 999px;
+            background: var(--card-2); border: 1px solid var(--border);
+            color: var(--muted); font-weight: bold; font-size: 14px;
+        }
+        .step.active { background: var(--primary); color: #082f49; border-color: var(--primary); }
+        .step.done { color: var(--green); border-color: var(--green); }
+        .step-arrow { color: var(--muted); }
+        .status-metrics {
+            display: flex; gap: 22px; justify-content: center; align-items: center;
+            flex-wrap: wrap; margin-bottom: 12px; font-size: 16px; color: var(--muted);
+        }
+        .status-metrics b { color: var(--primary); font-size: 22px; }
+        #timerBig { font-size: 22px; font-weight: bold; color: var(--primary); }
         #timerBig.urgent { color: #f87171; animation: blink 1s infinite; }
         @keyframes blink { 50% { opacity: 0.4; } }
+        .primary-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+        .primary-actions button { margin-top: 0; }
+        .next-step {
+            font-size: 19px; padding: 16px 28px;
+            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.35);
+        }
+        .ghost-danger { background: none; border: 1px solid #f87171; color: #f87171; }
+        .phase-hint { text-align: center; color: var(--muted); font-size: 14px; margin-top: 12px; }
+
+        /* ---- Collapsible card header ---- */
+        .collapse-head {
+            display: flex; justify-content: space-between; align-items: center;
+            cursor: pointer; user-select: none;
+        }
+        .collapse-head h2 { margin: 0; text-align: left; font-size: 20px; }
+        .collapse-head .chev { color: var(--primary); font-size: 20px; }
+        hr.sep { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
 
         .question-banner {
             background: linear-gradient(135deg, #1e293b, #312e81);
@@ -199,6 +240,17 @@
         th { color: var(--muted); font-size: 13px; text-transform: uppercase; }
         td.pts { font-weight: bold; color: var(--gold); font-size: 18px; }
 
+        /* Danger zone */
+        .danger-zone {
+            border: 1px solid #b91c1c;
+            background: #2a0f0f;
+            border-radius: 12px;
+            padding: 14px 16px;
+            margin-top: 14px;
+        }
+        .danger-zone h3 { margin: 0 0 6px; color: #fca5a5; }
+        .danger-zone p { color: #fca5a5; font-size: 13px; margin: 0 0 10px; }
+
         /* Podium overlay */
         #podiumOverlay {
             position: fixed; inset: 0;
@@ -260,129 +312,188 @@
 <div class="container">
     <h1>S.W.I.F.T. <span class="spark">Arena</span> — Teacher Console</h1>
 
-    <div class="phase-pill" id="phasePill">Phase: — no active question —</div>
+    <div class="tabbar">
+        <button id="tabBtnRun" onclick="switchTab('run')">🎬 Run Lesson</button>
+        <button id="tabBtnSetup" onclick="switchTab('setup')">🛠 Setup</button>
+    </div>
 
-    <div class="card">
-        <label for="qText">Question to flash on screen</label>
-        <textarea id="qText" placeholder="Type your question here… (optional if you attach an image)"></textarea>
+    <!-- ============================ RUN TAB ============================ -->
+    <div id="tabRun">
 
-        <label for="qImage">Image (optional — photo, diagram, source…)</label>
-        <input type="file" id="qImage" accept="image/*">
-        <div id="imgPreviewWrap" class="hidden" style="margin-top:10px; text-align:center;">
-            <img id="imgPreview" style="max-width:100%; max-height:300px; border-radius:8px; border:1px solid var(--border);">
-            <br><button type="button" style="padding:8px 16px; margin-top:8px;" class="danger" onclick="removeImage()">✕ Remove image</button>
+        <!-- Sticky control + status bar -->
+        <div class="runbar">
+            <div class="step-strip">
+                <span class="step" id="step-answer">① Answer</span>
+                <span class="step-arrow">→</span>
+                <span class="step" id="step-vote">② Vote</span>
+                <span class="step-arrow">→</span>
+                <span class="step" id="step-podium">③ Podium</span>
+            </div>
+            <div class="status-metrics">
+                <span>✍️ <b id="countSubmitted">0</b> submitted</span>
+                <span>💬 <b id="countCritiques">0</b> critiques</span>
+                <span>⏱ <span id="timerBig">–</span></span>
+            </div>
+            <div class="primary-actions">
+                <button id="openVotingBtn" class="greenbtn hidden" onclick="openVoting()">🗳 Open Voting</button>
+                <button id="podiumBtn" class="goldbtn hidden" onclick="showValidation()">🏆 Validate Top 3</button>
+                <button id="redoBtn" class="greenbtn hidden" onclick="pushRedo()">🔄 Redo Round</button>
+                <button id="replayBtn" class="goldbtn hidden" onclick="replayPodium()">🎬 Replay Podium</button>
+                <button id="clearBoardBtn" class="ghost-danger hidden" onclick="clearBoard()">🧹 End Round</button>
+            </div>
+            <div class="phase-hint" id="phaseHint"></div>
         </div>
 
-        <label for="qMinutes">Timer (minutes, optional — leave blank for none)</label>
-        <input type="number" id="qMinutes" min="1" max="60" placeholder="e.g. 5">
+        <!-- Push a question (collapsible) -->
+        <div class="card">
+            <div class="collapse-head" onclick="togglePush()">
+                <h2>➕ Push a Question</h2>
+                <span class="chev" id="pushChevron">▾</span>
+            </div>
+            <div id="pushBody" style="margin-top:6px;">
+                <label for="runLessonSel">From a prepared lesson</label>
+                <select id="runLessonSel" onchange="renderRunLesson()"></select>
+                <p class="muted" id="runLessonInfo" style="text-align:left; margin:8px 0;"></p>
+                <button class="goldbtn" id="runPushNextBtn" style="width:100%;" onclick="pushNextRun()">▶ Push Next</button>
 
-        <label for="qCritLimit">Critiques per student this round</label>
-        <input type="number" id="qCritLimit" min="0" max="10" value="2">
+                <hr class="sep">
 
-        <div class="controls-row">
-            <button onclick="pushQuestion()">🚀 Push Question</button>
-            <button id="addLessonBtn" class="goldbtn" onclick="addToLesson()">➕ Add to Lesson</button>
-            <button id="cancelEditBtn" class="danger hidden" onclick="cancelEditQ()">✕ Cancel Edit</button>
-            <button id="openVotingBtn" class="greenbtn" onclick="openVoting()" disabled>🗳 Open Voting</button>
-            <button id="podiumBtn" class="goldbtn" onclick="showValidation()" disabled>🏆 Validate Top 3</button>
-            <button id="redoBtn" class="greenbtn" onclick="pushRedo()" disabled>🔄 Redo Round</button>
-            <button class="danger" onclick="clearBoard()">🧹 Clear Board</button>
+                <label for="qTextRun">Or type a one-off question</label>
+                <textarea id="qTextRun" placeholder="Type your question here… (optional if you attach an image)"></textarea>
+                <label for="qImageRun">Image (optional — photo, diagram, source…)</label>
+                <input type="file" id="qImageRun" accept="image/*">
+                <div id="imgPreviewWrapRun" class="hidden" style="margin-top:10px; text-align:center;">
+                    <img id="imgPreviewRun" style="max-width:100%; max-height:300px; border-radius:8px; border:1px solid var(--border);">
+                    <br><button type="button" style="padding:8px 16px; margin-top:8px;" class="danger" onclick="removeImageRun()">✕ Remove image</button>
+                </div>
+                <label for="qMinutesRun">Timer (minutes, optional — leave blank for none)</label>
+                <input type="number" id="qMinutesRun" min="1" max="60" placeholder="e.g. 5">
+                <label for="qCritLimitRun">Critiques per student this round</label>
+                <input type="number" id="qCritLimitRun" min="0" max="10" value="2">
+                <button onclick="pushQuestion()" style="width:100%;">🚀 Push Question</button>
+            </div>
         </div>
-        <div class="controls-row">
-            <button class="greenbtn" onclick="exportCSV()">⬇️ Download All Responses (CSV)</button>
-            <button class="danger" onclick="resetScores()">🔁 Reset Scores (new session)</button>
-            <button class="danger" onclick="deleteOldRounds()">🗑 Delete Rounds Older Than 30 Days</button>
-            <button id="replayBtn" class="goldbtn hidden" onclick="replayPodium()">🎬 Replay Podium</button>
+
+        <!-- Podium validation panel -->
+        <div class="card hidden" id="validatePanel">
+            <h2>🏆 Validate the Podium</h2>
+            <p class="muted">Pre-filled with the top 3 by student votes. Swap any slot if a top answer doesn't deserve it, then confirm to award points.</p>
+            <label>🥇 1st place (+5 points)</label>
+            <select id="slotSel1" onchange="updateSlotPreview(1)"></select>
+            <div class="slot-preview" id="slotPrev1"></div>
+            <label>🥈 2nd place (+3 points)</label>
+            <select id="slotSel2" onchange="updateSlotPreview(2)"></select>
+            <div class="slot-preview" id="slotPrev2"></div>
+            <label>🥉 3rd place (+2 points)</label>
+            <select id="slotSel3" onchange="updateSlotPreview(3)"></select>
+            <div class="slot-preview" id="slotPrev3"></div>
+            <div class="controls-row">
+                <button class="goldbtn" onclick="confirmPodium()">✓ Confirm & Reveal Podium</button>
+                <button onclick="document.getElementById('validatePanel').classList.add('hidden')">Cancel</button>
+            </div>
+        </div>
+
+        <div class="question-banner" id="liveQuestion">No active question</div>
+        <div class="card hidden" id="liveImageWrap" style="text-align:center;">
+            <img id="liveImage" style="max-width:100%; max-height:420px; border-radius:8px;">
+        </div>
+
+        <div class="card hidden" id="selfcheckCard">
+            <h2>🪞 Self-Check Tally</h2>
+            <p class="muted">After the podium, students rate their own answer against the model, dimension by dimension. Red rows = where the class thinks it's weak.</p>
+            <div id="selfcheckRows"></div>
+        </div>
+
+        <div class="card">
+            <h2>🏅 Session Leaderboard</h2>
+            <table>
+                <thead><tr><th>#</th><th>Student</th><th>Points</th></tr></thead>
+                <tbody id="scoreBody"><tr><td colspan="3" class="muted">No points awarded yet.</td></tr></tbody>
+            </table>
+        </div>
+
+        <h2>Live Responses (sorted by votes)</h2>
+        <div id="feedContainer"><p class="muted">Responses will appear here as students submit.</p></div>
+    </div>
+
+    <!-- ============================ SETUP TAB ============================ -->
+    <div id="tabSetup" class="hidden">
+
+        <div class="card">
+            <h2>🏫 Classes</h2>
+            <p class="muted">Up to 6 classes, each with its own roster and its own scoreboard. Pick a slot, fill in the details, then "Use This Class Now" before the lesson starts.</p>
+            <label for="classSlot">Class slot</label>
+            <select id="classSlot" onchange="loadClassSlot()"></select>
+            <label for="className">Class name</label>
+            <input type="text" id="className" placeholder="e.g. 6 Resilience">
+            <label for="rosterText">Roster (one name per line — students pick from this list)</label>
+            <textarea id="rosterText" style="height:130px;" placeholder="Marcus&#10;Ethan&#10;Wei Jie&#10;…"></textarea>
+            <div class="controls-row">
+                <button onclick="saveClass()">💾 Save Class</button>
+                <button class="goldbtn" onclick="setActiveClass()">✅ Use This Class Now</button>
+            </div>
+            <p class="muted"><span id="activeClassLabel"></span> <span id="rosterStatus"></span></p>
+            <div id="missingWrap" class="hidden" style="margin-top:8px;">
+                <strong style="color:#f87171;">⏳ Not yet submitted:</strong>
+                <span id="missingNames"></span>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>📚 Lessons — prepare &amp; build</h2>
+            <p class="muted">Up to 10 saved lessons, each with up to 10 questions. Compose a question below (with image/timer/critique limit) and hit "➕ Add to Lesson". In class, push them from the Run tab — one tap at a time, or in sequence.</p>
+            <label for="lessonSlot">Lesson slot</label>
+            <select id="lessonSlot" onchange="lessonSlotChanged()"></select>
+            <label for="lessonName">Lesson name</label>
+            <input type="text" id="lessonName" placeholder="e.g. Energy — Term 3 Week 2">
+            <div class="controls-row">
+                <button onclick="saveLessonName()">💾 Save Name</button>
+                <button class="danger" onclick="deleteLesson()">🗑 Delete Lesson</button>
+            </div>
+
+            <hr class="sep">
+
+            <label for="qText">Question</label>
+            <textarea id="qText" placeholder="Type your question here… (optional if you attach an image)"></textarea>
+            <label for="qImage">Image (optional — photo, diagram, source…)</label>
+            <input type="file" id="qImage" accept="image/*">
+            <div id="imgPreviewWrap" class="hidden" style="margin-top:10px; text-align:center;">
+                <img id="imgPreview" style="max-width:100%; max-height:300px; border-radius:8px; border:1px solid var(--border);">
+                <br><button type="button" style="padding:8px 16px; margin-top:8px;" class="danger" onclick="removeImage()">✕ Remove image</button>
+            </div>
+            <label for="qMinutes">Timer (minutes, optional — leave blank for none)</label>
+            <input type="number" id="qMinutes" min="1" max="60" placeholder="e.g. 5">
+            <label for="qCritLimit">Critiques per student this round</label>
+            <input type="number" id="qCritLimit" min="0" max="10" value="2">
+            <div class="controls-row">
+                <button id="addLessonBtn" class="goldbtn" onclick="addToLesson()">➕ Add to Lesson</button>
+                <button id="cancelEditBtn" class="danger hidden" onclick="cancelEditQ()">✕ Cancel Edit</button>
+            </div>
+
+            <div id="lessonQs" style="margin-top:14px;"></div>
+        </div>
+
+        <div class="card qr-row">
+            <strong>Students scan to join:</strong><br><br>
+            <img id="qrImg" width="180" height="180" alt="QR code">
+            <p class="muted" id="studentUrl"></p>
+            <p class="muted">🖥 Projector view (open on the classroom screen): <span id="projUrl" style="color:var(--primary);"></span></p>
+        </div>
+
+        <div class="card">
+            <h2>🗄 Manage</h2>
+            <button class="greenbtn" style="width:100%;" onclick="exportCSV()">⬇️ Download All Responses (CSV)</button>
+
+            <div class="danger-zone">
+                <h3>⚠️ Danger zone</h3>
+                <p>These can't be undone. Each asks you to type a word to confirm.</p>
+                <div class="controls-row">
+                    <button class="danger" onclick="resetScores()">🔁 Reset Scores (new session)</button>
+                    <button class="danger" onclick="deleteOldRounds()">🗑 Delete Rounds Older Than 30 Days</button>
+                </div>
+            </div>
         </div>
     </div>
-
-    <!-- Podium validation panel -->
-    <div class="card hidden" id="validatePanel">
-        <h2>🏆 Validate the Podium</h2>
-        <p class="muted">Pre-filled with the top 3 by student votes. Swap any slot if a top answer doesn't deserve it, then confirm to award points.</p>
-        <label>🥇 1st place (+5 points)</label>
-        <select id="slotSel1" onchange="updateSlotPreview(1)"></select>
-        <div class="slot-preview" id="slotPrev1"></div>
-        <label>🥈 2nd place (+3 points)</label>
-        <select id="slotSel2" onchange="updateSlotPreview(2)"></select>
-        <div class="slot-preview" id="slotPrev2"></div>
-        <label>🥉 3rd place (+2 points)</label>
-        <select id="slotSel3" onchange="updateSlotPreview(3)"></select>
-        <div class="slot-preview" id="slotPrev3"></div>
-        <div class="controls-row">
-            <button class="goldbtn" onclick="confirmPodium()">✓ Confirm & Reveal Podium</button>
-            <button onclick="document.getElementById('validatePanel').classList.add('hidden')">Cancel</button>
-        </div>
-    </div>
-
-    <div class="card qr-row">
-        <strong>Students scan to join:</strong><br><br>
-        <img id="qrImg" width="180" height="180" alt="QR code">
-        <p class="muted" id="studentUrl"></p>
-        <p class="muted">🖥 Projector view (open on the classroom screen): <span id="projUrl" style="color:var(--primary);"></span></p>
-    </div>
-
-    <div class="card">
-        <h2>🏫 Classes</h2>
-        <p class="muted">Up to 6 classes, each with its own roster and its own scoreboard. Pick a slot, fill in the details, then "Use This Class Now" before the lesson starts.</p>
-        <label for="classSlot">Class slot</label>
-        <select id="classSlot" onchange="loadClassSlot()"></select>
-        <label for="className">Class name</label>
-        <input type="text" id="className" placeholder="e.g. 6 Resilience">
-        <label for="rosterText">Roster (one name per line — students pick from this list)</label>
-        <textarea id="rosterText" style="height:130px;" placeholder="Marcus&#10;Ethan&#10;Wei Jie&#10;…"></textarea>
-        <div class="controls-row">
-            <button onclick="saveClass()">💾 Save Class</button>
-            <button class="goldbtn" onclick="setActiveClass()">✅ Use This Class Now</button>
-        </div>
-        <p class="muted"><span id="activeClassLabel"></span> <span id="rosterStatus"></span></p>
-        <div id="missingWrap" class="hidden" style="margin-top:8px;">
-            <strong style="color:#f87171;">⏳ Not yet submitted:</strong>
-            <span id="missingNames"></span>
-        </div>
-    </div>
-
-    <div class="card">
-        <h2>📚 Lessons — prepare &amp; run</h2>
-        <p class="muted">Up to 10 saved lessons, each with up to 10 questions. To build: type a question in the box above (with image/timer/critique limit) and hit "➕ Add to Lesson". In class: push the questions one tap at a time.</p>
-        <label for="lessonSlot">Lesson slot</label>
-        <select id="lessonSlot" onchange="lessonSlotChanged()"></select>
-        <label for="lessonName">Lesson name</label>
-        <input type="text" id="lessonName" placeholder="e.g. Energy — Term 3 Week 2">
-        <div class="controls-row">
-            <button onclick="saveLessonName()">💾 Save Name</button>
-            <button class="danger" onclick="deleteLesson()">🗑 Delete Lesson</button>
-        </div>
-        <div id="lessonQs" style="margin-top:14px;"></div>
-    </div>
-
-    <div class="card statbar">
-        <div class="stat"><div class="num" id="countSubmitted">0</div><div class="lbl">Submitted</div></div>
-        <div class="stat"><div class="num" id="countCritiques">0</div><div class="lbl">Critiques</div></div>
-        <div class="stat"><div id="timerBig">–</div><div class="lbl">Time left</div></div>
-    </div>
-
-    <div class="question-banner" id="liveQuestion">No active question</div>
-    <div class="card hidden" id="liveImageWrap" style="text-align:center;">
-        <img id="liveImage" style="max-width:100%; max-height:420px; border-radius:8px;">
-    </div>
-
-    <div class="card hidden" id="selfcheckCard">
-        <h2>🪞 Self-Check Tally</h2>
-        <p class="muted">After the podium, students rate their own answer against the model, dimension by dimension. Red rows = where the class thinks it's weak.</p>
-        <div id="selfcheckRows"></div>
-    </div>
-
-    <div class="card">
-        <h2>🏅 Session Leaderboard</h2>
-        <table>
-            <thead><tr><th>#</th><th>Student</th><th>Points</th></tr></thead>
-            <tbody id="scoreBody"><tr><td colspan="3" class="muted">No points awarded yet.</td></tr></tbody>
-        </table>
-    </div>
-
-    <h2>Live Responses (sorted by votes)</h2>
-    <div id="feedContainer"><p class="muted">Responses will appear here as students submit.</p></div>
 </div>
 
 <!-- Podium reveal overlay -->
@@ -436,6 +547,33 @@
         return DIMS.map(([k, label]) =>
             `<div class="dimension d-${k}"><b>${label}:</b> ${esc(post[k])}</div>`
         ).join('');
+    }
+
+    // ---- Tabs: Run (live) vs Setup (prepare/admin). Last tab is remembered. ----
+    function switchTab(name) {
+        document.getElementById('tabRun').classList.toggle('hidden', name !== 'run');
+        document.getElementById('tabSetup').classList.toggle('hidden', name !== 'setup');
+        document.getElementById('tabBtnRun').classList.toggle('active', name === 'run');
+        document.getElementById('tabBtnSetup').classList.toggle('active', name === 'setup');
+        localStorage.setItem('swift-teacher-tab', name);
+    }
+    switchTab(localStorage.getItem('swift-teacher-tab') || 'run');
+
+    // ---- Collapsible "Push a Question" panel ----
+    function togglePush() {
+        const body = document.getElementById('pushBody');
+        const hidden = body.classList.toggle('hidden');
+        document.getElementById('pushChevron').textContent = hidden ? '▸' : '▾';
+    }
+    function collapsePush() {
+        document.getElementById('pushBody').classList.add('hidden');
+        document.getElementById('pushChevron').textContent = '▸';
+    }
+
+    // ---- Type-to-confirm guard for destructive actions ----
+    function typeConfirm(word, msg) {
+        const ans = prompt(msg + '\n\nType ' + word + ' to confirm:');
+        return ans !== null && ans.trim().toUpperCase() === word;
     }
 
     // ---- PIN gate (deterrent against student mischief, not real security) ----
@@ -570,15 +708,25 @@
     function nextIdxKey(slot) { return 'swift-runner-' + slot; }
 
     function refreshLessonUI() {
-        const sel = document.getElementById('lessonSlot');
-        const cur = sel.value || '1';
-        sel.innerHTML = Array.from({ length: 10 }, (_, i) => i + 1).map(i => {
+        const opts = Array.from({ length: 10 }, (_, i) => i + 1).map(i => {
             const L = lessons[i];
             const n = (L && L.questions) ? L.questions.length : 0;
             return `<option value="${i}">${i}. ${L && L.name ? esc(L.name) : '(empty)'} — ${n} Q${n === 1 ? '' : 's'}</option>`;
         }).join('');
+
+        const sel = document.getElementById('lessonSlot');
+        const cur = sel.value || '1';
+        sel.innerHTML = opts;
         sel.value = cur;
+
+        // Mirror the same options into the Run tab's "push from lesson" picker
+        const runSel = document.getElementById('runLessonSel');
+        const runCur = runSel.value || cur;
+        runSel.innerHTML = opts;
+        runSel.value = runCur;
+
         renderLessonQs();
+        renderRunLesson();
     }
 
     function lessonSlotChanged() {
@@ -743,6 +891,7 @@
         });
         localStorage.setItem(nextIdxKey(slot), String(i + 1));
         renderLessonQs();
+        renderRunLesson();
     }
 
     // Populate the slot dropdowns immediately so the UI works even
@@ -764,7 +913,7 @@
                 ondragstart="lessonDragStart(event,${i})" ondragover="lessonDragOver(event,${i})"
                 ondragleave="lessonDragLeave(event)" ondrop="lessonDrop(event,${i})" ondragend="lessonDragEnd(event)">
                 <span class="drag-handle" title="Drag to reorder">⠿</span>
-                <span style="flex:1; cursor:pointer;" onclick="selectQ(${i})">${i === selectedQ ? '🎯 ' : ''}${i < next ? '✅ ' : ''}<strong>Q${i + 1}.</strong>
+                <span style="flex:1;">${i < next ? '✅ ' : ''}<strong>Q${i + 1}.</strong>
                     ${esc((ql.q || '').slice(0, 80))}${(ql.q || '').length > 80 ? '…' : ''}
                     ${ql.image ? ' 🖼' : ''}${ql.mins ? ' ⏱' + ql.mins + 'm' : ''} 💬${ql.crit != null ? ql.crit : 2}</span>
                 <button class="spot-btn" style="margin:0;" onclick="editQ(${i})">✏️ Edit</button>
@@ -772,21 +921,42 @@
                 <button class="spot-btn" style="margin:0;" onclick="moveQ(${i}, 1)" ${i === qs.length - 1 ? 'disabled' : ''}>↓</button>
                 <button class="spot-btn" style="margin:0; border-color:#f87171; color:#f87171;" onclick="delQ(${i})">✕</button>
             </div>`).join('') +
-            `<button class="greenbtn" style="width:100%;" onclick="pushSelectedQ()" ${selectedQ === null ? 'disabled' : ''}>
-                🚀 ${selectedQ === null ? 'Tap a question above to select it' : 'Push Selected — Q' + (selectedQ + 1) + ' to Screen'}
-            </button>` +
-            (next < qs.length
-                ? `<button class="goldbtn" style="width:100%;" onclick="pushLessonQ(${next})">▶ Push Next in Sequence — Q${next + 1} of ${qs.length}</button>`
-                : `<p class="muted" style="text-align:center;">🏁 All ${qs.length} questions pushed in sequence.</p>`);
+            `<p class="muted" style="margin-top:10px;">▶ Push these from the <strong>Run Lesson</strong> tab — one at a time or in sequence.</p>`;
     }
 
-    function selectQ(i) {
-        selectedQ = (selectedQ === i) ? null : i; // tap again to deselect
-        renderLessonQs();
+    // ---- Run tab: push questions from a prepared lesson, in sequence ----
+    function renderRunLesson() {
+        const slot = document.getElementById('runLessonSel').value || '1';
+        const qs = ((lessons[slot] || {}).questions) || [];
+        const next = parseInt(localStorage.getItem(nextIdxKey(slot)) || '0', 10);
+        const info = document.getElementById('runLessonInfo');
+        const btn = document.getElementById('runPushNextBtn');
+        if (!qs.length) {
+            info.textContent = 'This lesson has no questions yet — build it in the Setup tab.';
+            btn.disabled = true;
+            btn.textContent = '▶ Push Next';
+            return;
+        }
+        if (next >= qs.length) {
+            info.innerHTML = `🏁 All ${qs.length} questions pushed in sequence.`;
+            btn.disabled = true;
+            btn.textContent = '▶ All pushed';
+            return;
+        }
+        info.innerHTML = `Next up — <strong>Q${next + 1} of ${qs.length}</strong>: ` +
+            esc((qs[next].q || '').slice(0, 80)) + ((qs[next].q || '').length > 80 ? '…' : '');
+        btn.disabled = false;
+        btn.textContent = `▶ Push Next — Q${next + 1} of ${qs.length}`;
     }
 
-    function pushSelectedQ() {
-        if (selectedQ !== null) pushLessonQ(selectedQ);
+    function pushNextRun() {
+        const slot = document.getElementById('runLessonSel').value || '1';
+        // Keep the Setup-tab slot in sync so pushLessonQ()/curLessonSlot() agree
+        document.getElementById('lessonSlot').value = slot;
+        const qs = ((lessons[slot] || {}).questions) || [];
+        const next = parseInt(localStorage.getItem(nextIdxKey(slot)) || '0', 10);
+        if (next >= qs.length) return;
+        pushLessonQ(next);
     }
 
     function updateMissing() {
@@ -802,7 +972,7 @@
 
     // ---- Storage housekeeping ----
     function deleteOldRounds() {
-        if (!confirm('Delete all rounds (questions + answers + critiques) older than 30 days? Scores and the roster are kept. This cannot be undone.')) return;
+        if (!typeConfirm('DELETE', 'Delete all rounds (questions + answers + critiques) older than 30 days? Scores and the roster are kept. This cannot be undone.')) return;
         const cutoff = Date.now() - 30 * 24 * 3600 * 1000;
         Promise.all([
             db.ref('rounds').once('value'),
@@ -824,36 +994,51 @@
     }
 
     // ---- Question image (compressed, stored as data URL) ----
+    // Shared between the Setup composer (questionImage) and the Run quick-push
+    // box (questionImageRun); same compress-and-cap logic for both.
     let questionImage = null;
+    let questionImageRun = null;
 
-    document.getElementById('qImage').addEventListener('change', function() {
-        const file = this.files[0];
-        if (!file) return;
-        const img = new Image();
-        img.onload = () => {
-            const scale = Math.min(1, 1200 / Math.max(img.width, img.height));
-            const canvas = document.createElement('canvas');
-            canvas.width = Math.round(img.width * scale);
-            canvas.height = Math.round(img.height * scale);
-            canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-            questionImage = canvas.toDataURL('image/jpeg', 0.72);
-            URL.revokeObjectURL(img.src);
-            if (questionImage.length > 900000) {
-                alert('That image is very large even after compression — try a smaller or simpler image.');
-                removeImage();
-                return;
-            }
-            document.getElementById('imgPreview').src = questionImage;
-            document.getElementById('imgPreviewWrap').classList.remove('hidden');
-        };
-        img.onerror = () => alert('Could not read that file as an image.');
-        img.src = URL.createObjectURL(file);
-    });
+    function makeImageInput(inputId, wrapId, imgId, onDone) {
+        document.getElementById(inputId).addEventListener('change', function() {
+            const file = this.files[0];
+            if (!file) return;
+            const img = new Image();
+            img.onload = () => {
+                const scale = Math.min(1, 1200 / Math.max(img.width, img.height));
+                const canvas = document.createElement('canvas');
+                canvas.width = Math.round(img.width * scale);
+                canvas.height = Math.round(img.height * scale);
+                canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                const data = canvas.toDataURL('image/jpeg', 0.72);
+                URL.revokeObjectURL(img.src);
+                if (data.length > 900000) {
+                    alert('That image is very large even after compression — try a smaller or simpler image.');
+                    onDone(null);
+                    document.getElementById(inputId).value = '';
+                    document.getElementById(wrapId).classList.add('hidden');
+                    return;
+                }
+                onDone(data);
+                document.getElementById(imgId).src = data;
+                document.getElementById(wrapId).classList.remove('hidden');
+            };
+            img.onerror = () => alert('Could not read that file as an image.');
+            img.src = URL.createObjectURL(file);
+        });
+    }
+    makeImageInput('qImage', 'imgPreviewWrap', 'imgPreview', d => questionImage = d);
+    makeImageInput('qImageRun', 'imgPreviewWrapRun', 'imgPreviewRun', d => questionImageRun = d);
 
     function removeImage() {
         questionImage = null;
         document.getElementById('qImage').value = '';
         document.getElementById('imgPreviewWrap').classList.add('hidden');
+    }
+    function removeImageRun() {
+        questionImageRun = null;
+        document.getElementById('qImageRun').value = '';
+        document.getElementById('imgPreviewWrapRun').classList.add('hidden');
     }
 
     // ---- Round lifecycle ----
@@ -875,21 +1060,22 @@
         return confirm(msg);
     }
 
+    // Ad-hoc question from the Run tab's quick-push box.
     function pushQuestion() {
-        const q = document.getElementById('qText').value.trim();
-        if (!q && !questionImage) { alert('Type a question or attach an image first.'); return; }
+        const q = document.getElementById('qTextRun').value.trim();
+        if (!q && !questionImageRun) { alert('Type a question or attach an image first.'); return; }
         if (!confirmInterrupt()) return;
-        const mins = parseInt(document.getElementById('qMinutes').value, 10);
+        const mins = parseInt(document.getElementById('qMinutesRun').value, 10);
 
         const roundId = 'r' + Date.now();
         const questionText = q || 'Analyze the image using S.W.I.F.T.';
 
-        const critLimit = parseInt(document.getElementById('qCritLimit').value, 10);
+        const critLimit = parseInt(document.getElementById('qCritLimitRun').value, 10);
 
         db.ref('session/current').set({
             roundId: roundId,
             question: questionText,
-            image: questionImage,
+            image: questionImageRun,
             phase: 'answer',
             critLimit: isNaN(critLimit) ? 2 : critLimit,
             endsAt: mins > 0 ? Date.now() + mins * 60000 : null,
@@ -898,9 +1084,15 @@
         // Permanent record so the CSV export can pair answers with questions
         db.ref('rounds/' + roundId).set({
             question: questionText,
-            hadImage: !!questionImage,
+            hadImage: !!questionImageRun,
             startedAt: firebase.database.ServerValue.TIMESTAMP
         });
+
+        // Clear the quick-push box for the next one
+        document.getElementById('qTextRun').value = '';
+        document.getElementById('qMinutesRun').value = '';
+        document.getElementById('qCritLimitRun').value = '2';
+        removeImageRun();
     }
 
     function openVoting() {
@@ -912,7 +1104,6 @@
     function pushRedo() {
         if (!sessionData || !sessionData.roundId) return;
         if (!confirm('Push the SAME question again as a redo round? Students will see their first answer + feedback and improve it.')) return;
-        const mins = parseInt(document.getElementById('qMinutes').value, 10);
         const roundId = 'r' + Date.now();
         const origin = sessionData.redoOf || sessionData.roundId;
 
@@ -922,7 +1113,7 @@
             image: sessionData.image || null,
             phase: 'answer',
             critLimit: sessionData.critLimit != null ? sessionData.critLimit : 2,
-            endsAt: mins > 0 ? Date.now() + mins * 60000 : null,
+            endsAt: null,
             redoOf: origin,
             startedAt: firebase.database.ServerValue.TIMESTAMP
         });
@@ -941,14 +1132,14 @@
     }
 
     function clearBoard() {
-        if (!confirm('End the round? Student screens go back to "waiting". (Scores are kept.)')) return;
+        if (!typeConfirm('END', 'End the round? Student screens go back to "waiting". (Scores are kept.)')) return;
         db.ref('session/current').remove();
         document.getElementById('validatePanel').classList.add('hidden');
     }
 
     function resetScores() {
         const who = activeClass ? `"${activeClass.name}"` : 'the shared scoreboard';
-        if (!confirm(`Reset all points to zero for ${who}?`)) return;
+        if (!typeConfirm('RESET', `Reset all points to zero for ${who}?`)) return;
         db.ref(scoresPath()).remove();
     }
 
@@ -1079,24 +1270,51 @@
         addPoints(by, POINTS.star);
     }
 
-    // ---- Live session / posts / scores ----
-    const PHASE_LABELS = {
-        answer: '✍️ Phase 1: Answering',
-        vote: '🗳 Phase 2: Voting & Critique',
-        podium: '🏆 Phase 3: Podium shown'
+    // ---- Phase-aware Run controls: step strip + one obvious next action ----
+    const PHASE_HINTS = {
+        answer: 'Students are answering. Open voting once enough have locked in.',
+        vote: 'Students are voting & critiquing. Validate the top 3 when you’re ready.',
+        podium: 'Podium revealed & points awarded. Redo this question, or push the next one.'
     };
+    let prevPhase = undefined;
 
+    function updateRunUI(phase) {
+        const order = { answer: 0, vote: 1, podium: 2 };
+        ['answer', 'vote', 'podium'].forEach(s => {
+            const el = document.getElementById('step-' + s);
+            el.classList.toggle('active', s === phase);
+            el.classList.toggle('done', phase != null && order[s] < order[phase]);
+        });
+
+        const ov = document.getElementById('openVotingBtn');
+        const pb = document.getElementById('podiumBtn');
+        const rb = document.getElementById('redoBtn');
+        ov.classList.toggle('hidden', phase !== 'answer');
+        pb.classList.toggle('hidden', phase !== 'vote');
+        rb.classList.toggle('hidden', !(phase === 'vote' || phase === 'podium'));
+        document.getElementById('clearBoardBtn').classList.toggle('hidden', phase == null);
+        document.getElementById('replayBtn').classList.toggle('hidden',
+            !(sessionData && sessionData.podium));
+
+        // Highlight the single "next step" button for the current phase
+        const nextStepBtn = { answer: ov, vote: pb, podium: rb }[phase];
+        [ov, pb, rb].forEach(b => b.classList.toggle('next-step', b === nextStepBtn));
+
+        document.getElementById('phaseHint').textContent = phase
+            ? PHASE_HINTS[phase]
+            : 'No active question — push one from the panel below.';
+
+        // Give the feed room: auto-collapse the push panel when voting opens.
+        if (phase === 'vote' && prevPhase !== 'vote') collapsePush();
+        prevPhase = phase;
+    }
+
+    // ---- Live session / posts / scores ----
     db.ref('session/current').on('value', snap => {
         sessionData = snap.val();
         const phase = sessionData ? (sessionData.phase || 'answer') : null;
 
-        document.getElementById('phasePill').textContent =
-            phase ? 'Phase: ' + PHASE_LABELS[phase] : 'Phase: — no active question —';
-        document.getElementById('openVotingBtn').disabled = phase !== 'answer';
-        document.getElementById('podiumBtn').disabled = phase !== 'vote';
-        document.getElementById('redoBtn').disabled = !(phase === 'vote' || phase === 'podium');
-        document.getElementById('replayBtn').classList.toggle('hidden',
-            !(sessionData && sessionData.podium));
+        updateRunUI(phase);
 
         if (!sessionData || !sessionData.roundId) {
             currentRound = null;

@@ -63,7 +63,7 @@ cleverness.
 | File | Role |
 |---|---|
 | `index.html` | **Student app.** Phase-aware: waiting → answer form → locked → voting feed → podium/self-compare. Auto-handle identity, draft auto-save, vote/critique budgets. |
-| `teacher.html` | **Teacher console** (private, on the teacher's laptop). PIN-gated. Push questions, manage classes & lessons, validate podium, star critiques, live feed, leaderboard, CSV export, housekeeping. |
+| `teacher.html` | **Teacher console** (private, on the teacher's laptop/iPad). PIN-gated. Split into two tabs: **🎬 Run Lesson** (live: sticky phase-aware control bar with step strip + one highlighted next-step button, counts & timer, push questions ad-hoc or next-in-sequence, validate podium, star critiques, spotlight, live feed, leaderboard) and **🛠 Setup** (classes, lesson builder, QR/join, CSV export, danger zone). Tab choice persists in `localStorage` (`swift-teacher-tab`). |
 | `projector.html` | **Read-only classroom display** (the big screen). Phase-aware, **anonymity-safe** (never shows names during voting), runs the podium reveal + standings, shows spotlighted answers. No PIN. |
 | `review.html` | **Student revision book.** Pick a name/handle → see all past answers, feedback received, and model answers; print/save-as-PDF. |
 | `firebase-config.js` | Firebase project config (shared by all pages). Contains the teacher's real keys. |
@@ -237,6 +237,17 @@ Ordered roughly by teaching value. Confirm scope with the teacher before buildin
 
 Keep newest first. One line per meaningful change. Dates in YYYY-MM-DD.
 
+- 2026-06-22 — Teacher console UX overhaul: split into **Run Lesson** / **Setup**
+  tabs (remembered in `localStorage`). Run tab has a sticky phase-aware control
+  bar (Answer→Vote→Podium step strip, live submitted/critique counts + timer, and
+  a single highlighted next-step button), a collapsible "Push a Question" panel
+  (push next-in-sequence from a lesson, or a one-off ad-hoc question), then the
+  live feed/leaderboard. Setup tab holds classes, the lesson builder (compose +
+  Add to Lesson, edit/reorder/drag), QR/join info, CSV export, and a red **Danger
+  zone** (Reset Scores, Delete Old Rounds) gated by **type-to-confirm** prompts;
+  "End Round" (was Clear Board) is type-to-confirm too. No data-model or Firebase
+  rule changes. Behaviour note: a Redo Round now starts with no timer (the old
+  build reused whatever was typed in the compose box).
 - 2026-06-22 — Created CLAUDE.md.
 - 2026-06-22 — Added draft auto-save (student typing survives reload/sleep,
   cleared on lock-in) and warn-before-push when students are still in the answer
