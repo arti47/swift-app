@@ -79,7 +79,19 @@ All paths are world-readable/writable (no auth). **Rules must allow every
 top-level path below — if you add a new top-level path you MUST tell the teacher
 to add it to the Realtime Database rules, or reads/writes silently fail.**
 
+**Multi-tenant (rooms):** every path shown below is now namespaced under
+`rooms/<roomCode>/…` — each teacher operates their own **room** (their classes,
+lessons, scores, identities, and their own live `session`), so multiple teachers
+can run live lessons simultaneously without colliding. The room code is chosen by
+the teacher at login and carried to students/projector/review via `?room=CODE` in
+the URL (encoded in the join QR). All four pages resolve `room` first, then use a
+`ref(path)` helper = `db.ref('rooms/'+room+'/'+path)`. Two **global** paths sit
+outside rooms: `rooms` (the container) and `migrated` (one-time legacy-migration
+flag = the first room that absorbed the old single-tenant data). The special
+`.info/connected` presence path is never namespaced.
+
 ```
+rooms/<roomCode>/                   # one per teacher; all paths below are inside it
 session/current                     # the one live round, or null when idle
   roundId        "r<timestamp>"
   question       string
@@ -226,9 +238,8 @@ Ordered roughly by teaching value. Confirm scope with the teacher before buildin
 - **Per-dimension trend over time** — track which dimension the class is weakest
   on across lessons (data already in CSV; needs a teacher-facing view).
 - **Question bank polish** — richer library/search beyond the 10 lesson slots.
-- **Room codes / multi-class-simultaneous** — the app assumes ONE class at a
-  time; concurrent classes (or a colleague sharing the URL) would collide. Real
-  work; only if the need arises.
+- **Per-room teacher PIN reset / room admin** — no way yet to change a room's PIN
+  or delete a room from the console (edit the DB directly if needed).
 
 ### Known limitations (by design, not bugs)
 - No server-side enforcement (budgets/PIN are client-side).
@@ -243,10 +254,12 @@ Ordered roughly by teaching value. Confirm scope with the teacher before buildin
 
 1. Firebase project exists (`swift-analysis-81527`) with Realtime Database in
    `asia-southeast1`; `firebase-config.js` filled in (incl. `databaseURL`).
-2. **Realtime Database rules** allow all eight paths:
-   `session, posts, rounds, scores, settings, classes, lessons, identities`
-   (each `{".read": true, ".write": true}`). **`identities` is new — without it,
-   student login/PIN silently degrades to name-only.**
+2. **Realtime Database rules.** With multi-tenant rooms, the live data lives under
+   `rooms`, plus a `migrated` flag, plus the legacy top-level paths (kept readable
+   so the one-time migration can copy old data in). Allow:
+   `rooms, migrated, session, posts, rounds, scores, settings, classes, lessons,
+   identities` (each `{".read": true, ".write": true}`). The two that MUST be added
+   for rooms are **`rooms`** and **`migrated`** — without `rooms`, nothing loads.
 3. Deploy: drag the whole folder to **app.netlify.com/drop**.
 4. Teacher opens `teacher.html` → sets a PIN on first visit.
 5. Projector opens `projector.html`; students scan the QR to land on `index.html`.
@@ -256,6 +269,17 @@ Ordered roughly by teaching value. Confirm scope with the teacher before buildin
 ## 9. Changelog
 
 Keep newest first. One line per meaningful change. Dates in YYYY-MM-DD.
+
+- 2026-06-22 — **Multi-tenant rooms (multiple teachers, concurrent live lessons).**
+  Everything is now namespaced under `rooms/<roomCode>/…`. Each teacher logs in
+  with a chosen **room code** (+ per-room PIN); students/projector/review carry the
+  code via `?room=CODE` in the URL (encoded in the join QR). Each room has its own
+  live `session`, so teachers run lessons simultaneously without colliding. New
+  global paths **`rooms`** + **`migrated`** (must be added to RTDB rules). On the
+  first room's PIN creation, the old single-tenant classes/lessons/scores/roster
+  are **auto-migrated** into it. New **📥 Import from another room** tool copies a
+  colleague's class/lesson into your slots (by their room code). All four pages
+  resolve `room` first and use a `ref()` helper for every DB path.
 
 - 2026-06-22 — **Directed critiques (assign + restrict).** When the teacher opens
   voting, the app assigns each submitter **N specific peers** to critique (N = the
@@ -272,6 +296,10 @@ Keep newest first. One line per meaningful change. Dates in YYYY-MM-DD.
   on the student device (audio unlocked by their own tap). **(8)** CSV export now
   includes the **self-check (✅/🔧)** columns per dimension. **(10)** student
   **🔠 bigger-text** accessibility toggle (`swift-textsize`). No new top-level paths.
+- 2026-06-22 — Teacher Setup gains a **🗂 Past Questions** viewer: load past
+  rounds, pick any one from a dropdown, and review its answers/votes/critiques/
+  podium/model read-only (the live console only ever shows the active round; old
+  responses were retained in `rounds`/`posts` but weren't browsable in-app).
 - 2026-06-22 — **QR codes now generated locally** (vendored `qrcode.min.js`,
   same-origin) on `teacher.html` + `projector.html`, replacing the external
   `api.qrserver.com` image service that was blocked on the school network (QR

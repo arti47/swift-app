@@ -211,6 +211,18 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
+    // Multi-tenant: this projector shows one room (rooms/<roomCode>/…).
+    const room = ((new URLSearchParams(location.search)).get('room')
+        || localStorage.getItem('swift-room') || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (room) localStorage.setItem('swift-room', room);
+    function ref(p) { return firebase.database().ref('rooms/' + room + (p ? '/' + p : '')); }
+    if (!room) {
+        document.body.innerHTML = '<div class="container" style="text-align:center;"><h1>S.W.I.F.T. ' +
+            '<span style="color:#fbbf24;">Arena</span></h1><div class="card" style="max-width:600px;margin:0 auto;">' +
+            '<p class="sub">Open the projector from your teacher console’s projector link, or add ?room=YOURCODE to the URL.</p></div></div>';
+        throw new Error('no room');
+    }
+
     // Connection banner: show if the projector loses the server.
     let connTimer = null;
     db.ref('.info/connected').on('value', s => {
@@ -267,18 +279,18 @@
             document.getElementById(s).classList.toggle('hidden', s !== id));
     }
 
-    db.ref('session/current').on('value', snap => {
+    ref('session/current').on('value', snap => {
         session = snap.val();
         render();
     });
 
     // Follow the active class's scoreboard
     let scoresRef = null;
-    db.ref('settings/activeClass').on('value', snap => {
+    ref('settings/activeClass').on('value', snap => {
         const ac = snap.val();
         const path = 'scores/' + (ac && ac.slot ? 'c' + ac.slot : 'default');
         if (scoresRef) scoresRef.off();
-        scoresRef = db.ref(path);
+        scoresRef = ref(path);
         scoresRef.on('value', s => {
             const scores = Object.values(s.val() || {}).sort((a, b) => b.points - a.points);
             const medals = ['🥇', '🥈', '🥉'];
@@ -299,7 +311,7 @@
         if (session.roundId !== currentRound) {
             currentRound = session.roundId;
             if (postsRef) postsRef.off();
-            postsRef = db.ref('posts/' + currentRound);
+            postsRef = ref('posts/' + currentRound);
             postsRef.on('value', s => {
                 latestPosts = s.val() || {};
                 render();
