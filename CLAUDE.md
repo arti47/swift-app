@@ -84,7 +84,8 @@ session/current                     # the one live round, or null when idle
   question       string
   image          data-URL string | null   # compressed JPEG, embedded (no Firebase Storage)
   phase          "answer" | "vote" | "podium"
-  critLimit      number                    # critiques allowed per student this round
+  voteLimit      number                    # upvotes allowed per student this round (teacher-set)
+  critLimit      number                    # critiques allowed per student this round (teacher-set)
   endsAt         epoch ms | null           # countdown end, or null = no timer
   startedAt      server timestamp
   redoOf         roundId                   # present only on a redo round
@@ -119,7 +120,7 @@ classes/<1..6>                      # up to 6 saved classes
   { name, roster: [names] }
 
 lessons/<1..10>                     # up to 10 saved lessons
-  { name, questions: [ {q, image, mins, crit}, ... up to 10 ] }
+  { name, questions: [ {q, image, mins, vote, crit}, ... up to 10 ] }
 ```
 
 **Identity model:** students no longer type a name. Each device generates a
@@ -237,6 +238,12 @@ Ordered roughly by teaching value. Confirm scope with the teacher before buildin
 
 Keep newest first. One line per meaningful change. Dates in YYYY-MM-DD.
 
+- 2026-06-22 — Run tab now lists the selected lesson's questions inline:
+  tap one to select, then **🚀 Push Selected**, or **▶ Push Next in Sequence**
+  (no need to leave for the Setup tab). **Vote budget is now teacher-set per
+  round** (`session.voteLimit`, new `vote` field on lesson questions), alongside
+  the existing critique budget; the composer defaults to **2 votes / 3 critiques**.
+  Student app reads `session.voteLimit` (falls back to 2). No new top-level paths.
 - 2026-06-22 — Teacher console UX overhaul: split into **Run Lesson** / **Setup**
   tabs (remembered in `localStorage`). Run tab has a sticky phase-aware control
   bar (Answer→Vote→Podium step strip, live submitted/critique counts + timer, and

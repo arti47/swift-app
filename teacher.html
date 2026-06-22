@@ -352,9 +352,8 @@
             </div>
             <div id="pushBody" style="margin-top:6px;">
                 <label for="runLessonSel">From a prepared lesson</label>
-                <select id="runLessonSel" onchange="renderRunLesson()"></select>
-                <p class="muted" id="runLessonInfo" style="text-align:left; margin:8px 0;"></p>
-                <button class="goldbtn" id="runPushNextBtn" style="width:100%;" onclick="pushNextRun()">▶ Push Next</button>
+                <select id="runLessonSel" onchange="runLessonChanged()"></select>
+                <div id="runLessonList" style="margin-top:10px;"></div>
 
                 <hr class="sep">
 
@@ -368,8 +367,10 @@
                 </div>
                 <label for="qMinutesRun">Timer (minutes, optional — leave blank for none)</label>
                 <input type="number" id="qMinutesRun" min="1" max="60" placeholder="e.g. 5">
+                <label for="qVoteLimitRun">Votes per student this round</label>
+                <input type="number" id="qVoteLimitRun" min="0" max="10" value="2">
                 <label for="qCritLimitRun">Critiques per student this round</label>
-                <input type="number" id="qCritLimitRun" min="0" max="10" value="2">
+                <input type="number" id="qCritLimitRun" min="0" max="10" value="3">
                 <button onclick="pushQuestion()" style="width:100%;">🚀 Push Question</button>
             </div>
         </div>
@@ -463,8 +464,10 @@
             </div>
             <label for="qMinutes">Timer (minutes, optional — leave blank for none)</label>
             <input type="number" id="qMinutes" min="1" max="60" placeholder="e.g. 5">
+            <label for="qVoteLimit">Votes per student this round</label>
+            <input type="number" id="qVoteLimit" min="0" max="10" value="2">
             <label for="qCritLimit">Critiques per student this round</label>
-            <input type="number" id="qCritLimit" min="0" max="10" value="2">
+            <input type="number" id="qCritLimit" min="0" max="10" value="3">
             <div class="controls-row">
                 <button id="addLessonBtn" class="goldbtn" onclick="addToLesson()">➕ Add to Lesson</button>
                 <button id="cancelEditBtn" class="danger hidden" onclick="cancelEditQ()">✕ Cancel Edit</button>
@@ -760,12 +763,14 @@
         const L = lessons[slot] || { name: '', questions: [] };
         L.questions = L.questions || [];
         const mins = parseInt(document.getElementById('qMinutes').value, 10);
+        const vote = parseInt(document.getElementById('qVoteLimit').value, 10);
         const crit = parseInt(document.getElementById('qCritLimit').value, 10);
         const entry = {
             q: q || 'Analyze the image using S.W.I.F.T.',
             image: questionImage || null,
             mins: mins > 0 ? mins : null,
-            crit: isNaN(crit) ? 2 : crit
+            vote: isNaN(vote) ? 2 : vote,
+            crit: isNaN(crit) ? 3 : crit
         };
 
         if (editingQ !== null) {
@@ -784,7 +789,8 @@
     function clearComposeBox() {
         document.getElementById('qText').value = '';
         document.getElementById('qMinutes').value = '';
-        document.getElementById('qCritLimit').value = '2';
+        document.getElementById('qVoteLimit').value = '2';
+        document.getElementById('qCritLimit').value = '3';
         removeImage();
         editingQ = null;
         document.getElementById('addLessonBtn').textContent = '➕ Add to Lesson';
@@ -796,7 +802,8 @@
         if (!ql) return;
         document.getElementById('qText').value = ql.q || '';
         document.getElementById('qMinutes').value = ql.mins || '';
-        document.getElementById('qCritLimit').value = ql.crit != null ? ql.crit : 2;
+        document.getElementById('qVoteLimit').value = ql.vote != null ? ql.vote : 2;
+        document.getElementById('qCritLimit').value = ql.crit != null ? ql.crit : 3;
         if (ql.image) {
             questionImage = ql.image;
             document.getElementById('imgPreview').src = ql.image;
@@ -869,8 +876,8 @@
             r.classList.remove('dragging', 'drag-over'));
     }
 
-    function pushLessonQ(i) {
-        const slot = curLessonSlot();
+    function pushLessonQ(i, slot) {
+        slot = slot || curLessonSlot();
         const ql = ((lessons[slot] || {}).questions || [])[i];
         if (!ql) return;
         if (!confirmInterrupt()) return;
@@ -880,7 +887,8 @@
             question: ql.q,
             image: ql.image || null,
             phase: 'answer',
-            critLimit: ql.crit != null ? ql.crit : 2,
+            voteLimit: ql.vote != null ? ql.vote : 2,
+            critLimit: ql.crit != null ? ql.crit : 3,
             endsAt: ql.mins > 0 ? Date.now() + ql.mins * 60000 : null,
             startedAt: firebase.database.ServerValue.TIMESTAMP
         });
@@ -915,7 +923,7 @@
                 <span class="drag-handle" title="Drag to reorder">⠿</span>
                 <span style="flex:1;">${i < next ? '✅ ' : ''}<strong>Q${i + 1}.</strong>
                     ${esc((ql.q || '').slice(0, 80))}${(ql.q || '').length > 80 ? '…' : ''}
-                    ${ql.image ? ' 🖼' : ''}${ql.mins ? ' ⏱' + ql.mins + 'm' : ''} 💬${ql.crit != null ? ql.crit : 2}</span>
+                    ${ql.image ? ' 🖼' : ''}${ql.mins ? ' ⏱' + ql.mins + 'm' : ''} 🗳${ql.vote != null ? ql.vote : 2} 💬${ql.crit != null ? ql.crit : 3}</span>
                 <button class="spot-btn" style="margin:0;" onclick="editQ(${i})">✏️ Edit</button>
                 <button class="spot-btn" style="margin:0;" onclick="moveQ(${i}, -1)" ${i === 0 ? 'disabled' : ''}>↑</button>
                 <button class="spot-btn" style="margin:0;" onclick="moveQ(${i}, 1)" ${i === qs.length - 1 ? 'disabled' : ''}>↓</button>
@@ -924,39 +932,48 @@
             `<p class="muted" style="margin-top:10px;">▶ Push these from the <strong>Run Lesson</strong> tab — one at a time or in sequence.</p>`;
     }
 
-    // ---- Run tab: push questions from a prepared lesson, in sequence ----
+    // ---- Run tab: list a lesson's questions; tap to select, then push ----
+    // (or push the next one in sequence). Independent of the Setup tab's slot.
+    let selectedRunQ = null;
+
+    function runLessonChanged() {
+        selectedRunQ = null; // selection doesn't carry across lessons
+        renderRunLesson();
+    }
+
     function renderRunLesson() {
         const slot = document.getElementById('runLessonSel').value || '1';
         const qs = ((lessons[slot] || {}).questions) || [];
         const next = parseInt(localStorage.getItem(nextIdxKey(slot)) || '0', 10);
-        const info = document.getElementById('runLessonInfo');
-        const btn = document.getElementById('runPushNextBtn');
+        const box = document.getElementById('runLessonList');
         if (!qs.length) {
-            info.textContent = 'This lesson has no questions yet — build it in the Setup tab.';
-            btn.disabled = true;
-            btn.textContent = '▶ Push Next';
+            box.innerHTML = '<p class="muted" style="text-align:left;">This lesson has no questions yet — build it in the Setup tab.</p>';
             return;
         }
-        if (next >= qs.length) {
-            info.innerHTML = `🏁 All ${qs.length} questions pushed in sequence.`;
-            btn.disabled = true;
-            btn.textContent = '▶ All pushed';
-            return;
-        }
-        info.innerHTML = `Next up — <strong>Q${next + 1} of ${qs.length}</strong>: ` +
-            esc((qs[next].q || '').slice(0, 80)) + ((qs[next].q || '').length > 80 ? '…' : '');
-        btn.disabled = false;
-        btn.textContent = `▶ Push Next — Q${next + 1} of ${qs.length}`;
+        box.innerHTML = qs.map((ql, i) => `
+            <div class="lesson-row${i === next ? ' next' : ''}${i === selectedRunQ ? ' selected' : ''}"
+                 style="cursor:pointer;" onclick="selectRunQ(${i})">
+                <span style="flex:1;">${i === selectedRunQ ? '🎯 ' : ''}${i < next ? '✅ ' : ''}<strong>Q${i + 1}.</strong>
+                    ${esc((ql.q || '').slice(0, 70))}${(ql.q || '').length > 70 ? '…' : ''}
+                    ${ql.image ? ' 🖼' : ''}${ql.mins ? ' ⏱' + ql.mins + 'm' : ''} 🗳${ql.vote != null ? ql.vote : 2} 💬${ql.crit != null ? ql.crit : 3}</span>
+            </div>`).join('') +
+            `<button class="greenbtn" style="width:100%;" onclick="pushSelectedRun()" ${selectedRunQ === null ? 'disabled' : ''}>
+                🚀 ${selectedRunQ === null ? 'Tap a question above to select it' : 'Push Selected — Q' + (selectedRunQ + 1)}
+            </button>` +
+            (next < qs.length
+                ? `<button class="goldbtn" style="width:100%;" onclick="pushLessonQ(${next}, '${slot}')">▶ Push Next in Sequence — Q${next + 1} of ${qs.length}</button>`
+                : `<p class="muted">🏁 All ${qs.length} questions pushed in sequence.</p>`);
     }
 
-    function pushNextRun() {
+    function selectRunQ(i) {
+        selectedRunQ = (selectedRunQ === i) ? null : i; // tap again to deselect
+        renderRunLesson();
+    }
+
+    function pushSelectedRun() {
+        if (selectedRunQ === null) return;
         const slot = document.getElementById('runLessonSel').value || '1';
-        // Keep the Setup-tab slot in sync so pushLessonQ()/curLessonSlot() agree
-        document.getElementById('lessonSlot').value = slot;
-        const qs = ((lessons[slot] || {}).questions) || [];
-        const next = parseInt(localStorage.getItem(nextIdxKey(slot)) || '0', 10);
-        if (next >= qs.length) return;
-        pushLessonQ(next);
+        pushLessonQ(selectedRunQ, slot);
     }
 
     function updateMissing() {
@@ -1070,6 +1087,7 @@
         const roundId = 'r' + Date.now();
         const questionText = q || 'Analyze the image using S.W.I.F.T.';
 
+        const voteLimit = parseInt(document.getElementById('qVoteLimitRun').value, 10);
         const critLimit = parseInt(document.getElementById('qCritLimitRun').value, 10);
 
         db.ref('session/current').set({
@@ -1077,7 +1095,8 @@
             question: questionText,
             image: questionImageRun,
             phase: 'answer',
-            critLimit: isNaN(critLimit) ? 2 : critLimit,
+            voteLimit: isNaN(voteLimit) ? 2 : voteLimit,
+            critLimit: isNaN(critLimit) ? 3 : critLimit,
             endsAt: mins > 0 ? Date.now() + mins * 60000 : null,
             startedAt: firebase.database.ServerValue.TIMESTAMP
         });
@@ -1091,7 +1110,8 @@
         // Clear the quick-push box for the next one
         document.getElementById('qTextRun').value = '';
         document.getElementById('qMinutesRun').value = '';
-        document.getElementById('qCritLimitRun').value = '2';
+        document.getElementById('qVoteLimitRun').value = '2';
+        document.getElementById('qCritLimitRun').value = '3';
         removeImageRun();
     }
 
@@ -1112,7 +1132,8 @@
             question: sessionData.question,
             image: sessionData.image || null,
             phase: 'answer',
-            critLimit: sessionData.critLimit != null ? sessionData.critLimit : 2,
+            voteLimit: sessionData.voteLimit != null ? sessionData.voteLimit : 2,
+            critLimit: sessionData.critLimit != null ? sessionData.critLimit : 3,
             endsAt: null,
             redoOf: origin,
             startedAt: firebase.database.ServerValue.TIMESTAMP

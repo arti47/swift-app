@@ -344,7 +344,7 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    const VOTES_PER_ROUND = 3;
+    const VOTES_PER_ROUND = 2;   // fallback only; teacher sets session.voteLimit per round
     const MIN_CHARS = 10;   // minimum characters per dimension ("idk" guard)
 
     let session = null;        // session/current from DB
@@ -586,10 +586,13 @@
             });
     });
 
-    // ---- Votes-left budget (per round, per device) ----
+    // ---- Votes-left budget (limit set by teacher per round) ----
+    function voteLimit() {
+        return (session && session.voteLimit != null) ? session.voteLimit : VOTES_PER_ROUND;
+    }
     function votesLeft() {
         const v = localStorage.getItem('swift-votesleft-' + currentRound);
-        return v === null ? VOTES_PER_ROUND : parseInt(v, 10);
+        return v === null ? voteLimit() : parseInt(v, 10);
     }
 
     // ---- Critiques-left budget (limit set by teacher per round) ----
