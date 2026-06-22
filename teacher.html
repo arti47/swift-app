@@ -1479,6 +1479,19 @@
         timerInterval = setInterval(tick, 1000);
     }
 
+    // Live-feed reading-load controls: show only the top answers by votes, and
+    // keep critiques collapsed until you ask for them.
+    const FEED_TOP_N = 8;
+    let feedShowAll = false;
+    const expandedCrits = new Set();   // post ids whose critiques are expanded
+
+    function toggleFeedAll() { feedShowAll = !feedShowAll; renderFeed(); }
+    function toggleCrits(postId) {
+        if (expandedCrits.has(postId)) expandedCrits.delete(postId);
+        else expandedCrits.add(postId);
+        renderFeed();
+    }
+
     function renderFeed() {
         const posts = Object.entries(latestPosts)
             .map(([id, p]) => ({ id, ...p }))
@@ -1497,11 +1510,24 @@
             return;
         }
 
+        const total = posts.length;
+        const visible = feedShowAll ? posts : posts.slice(0, FEED_TOP_N);
+
+        const ctrl = document.createElement('div');
+        ctrl.style.cssText = 'display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px;';
+        ctrl.innerHTML =
+            `<span class="muted" style="text-align:left;">Showing ${visible.length} of ${total} — sorted by votes</span>` +
+            (total > FEED_TOP_N
+                ? `<button class="spot-btn" style="margin:0;" onclick="toggleFeedAll()">${feedShowAll ? 'Show top ' + FEED_TOP_N + ' only' : 'Show all ' + total}</button>`
+                : '');
+        feed.appendChild(ctrl);
+
         const topVotes = posts[0].upvotes || 0;
 
-        posts.forEach(post => {
+        visible.forEach(post => {
             const isTop = topVotes > 0 && (post.upvotes || 0) === topVotes;
             const critiques = Object.entries(post.critiques || {});
+            const critsOpen = expandedCrits.has(post.id);
             const el = document.createElement('div');
             el.className = 'card post' + (isTop ? ' top' : '');
             const spotOn = sessionData && sessionData.spotlight === post.id;
@@ -1516,20 +1542,24 @@
                     </span>
                 </div>
                 ${renderDims(post)}
-                ${critiques.length ? `<div class="critiques-list">
-                    ${critiques.map(([cid, c]) => `
-                        <div class="crit-row">
-                            <button class="star-btn" ${c.starred ? 'disabled' : ''}
-                                onclick="starCritique('${post.id}', '${cid}', '${esc(c.by).replace(/'/g, "\\'")}')">
-                                ${c.starred ? '⭐ +1 given' : '⭐ +1'}
-                            </button>
-                            <span><em>${esc(c.by)}:</em>
-                                <strong>A:</strong> ${esc(c.affirm)} ·
-                                <strong>C:</strong> ${esc(c.clarify)} ·
-                                <strong>S:</strong> ${esc(c.suggest)}</span>
-                        </div>
-                    `).join('')}
-                </div>` : ''}
+                ${critiques.length ? `
+                    <button class="spot-btn" style="margin:10px 0 0;" onclick="toggleCrits('${post.id}')">
+                        💬 ${critiques.length} critique${critiques.length === 1 ? '' : 's'} — ${critsOpen ? 'hide' : 'show'}
+                    </button>
+                    ${critsOpen ? `<div class="critiques-list">
+                        ${critiques.map(([cid, c]) => `
+                            <div class="crit-row">
+                                <button class="star-btn" ${c.starred ? 'disabled' : ''}
+                                    onclick="starCritique('${post.id}', '${cid}', '${esc(c.by).replace(/'/g, "\\'")}')">
+                                    ${c.starred ? '⭐ +1 given' : '⭐ +1'}
+                                </button>
+                                <span><em>${esc(c.by)}:</em>
+                                    <strong>A:</strong> ${esc(c.affirm)} ·
+                                    <strong>C:</strong> ${esc(c.clarify)} ·
+                                    <strong>S:</strong> ${esc(c.suggest)}</span>
+                            </div>
+                        `).join('')}
+                    </div>` : ''}` : ''}
             `;
             feed.appendChild(el);
         });

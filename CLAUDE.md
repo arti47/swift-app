@@ -240,6 +240,10 @@ Ordered roughly by teaching value. Confirm scope with the teacher before buildin
 
 Keep newest first. One line per meaningful change. Dates in YYYY-MM-DD.
 
+- 2026-06-22 — Teacher live feed reading-load controls: critiques are now
+  **collapsed by default** behind a per-answer "💬 N critiques — show" toggle, and
+  the feed shows only the **top 8 answers by votes** with a "Show all N" switch.
+  Cuts the wall of text during a live lesson; voting order does the triage.
 - 2026-06-22 — **Model answer on the projector** for whole-class debrief: at the
   podium the teacher console shows a **📺 Show Model on Screen** toggle
   (`session.showModel`) that flips the projector to a full-screen model answer —
