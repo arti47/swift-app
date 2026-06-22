@@ -149,10 +149,13 @@ the `identities` path is denied by rules, the app degrades to name-only (no PIN)
 flag clears it so everyone re-picks a real identity on first launch.)*
 
 **Per-device state in `localStorage` (student):** `swift-name` (chosen identity),
-`swift-idv2` (migration flag),
-`swift-post-<roundId>` (their submission id), `swift-votesleft-<roundId>`,
-`swift-vote-<roundId>-<postId>`, `swift-critsleft-<roundId>`,
-`swift-crit-<roundId>-<postId>`, `swift-draft-<roundId>` (auto-saved draft).
+`swift-idv2` (migration flag). All **per-round** keys are **suffixed with the
+identity's nameKey** so two students sharing one iPad in the same round keep
+separate state: `swift-post-<roundId>-<nameKey>` (their submission id),
+`swift-votesleft-<roundId>-<nameKey>`, `swift-vote-<roundId>-<nameKey>-<postId>`,
+`swift-critsleft-<roundId>-<nameKey>`, `swift-crit-<roundId>-<nameKey>-<postId>`,
+`swift-draft-<roundId>-<nameKey>` (auto-saved draft). Switching identity re-inits
+the round for the new student (clears the stale `myPostId`).
 Teacher: `swift-teacher-pin`, `swift-runner-<lessonSlot>` (next-question pointer).
 
 ---
@@ -252,6 +255,12 @@ Ordered roughly by teaching value. Confirm scope with the teacher before buildin
 
 Keep newest first. One line per meaningful change. Dates in YYYY-MM-DD.
 
+- 2026-06-22 — **Bugfix: shared-iPad identity switch.** Per-round student state
+  (submission pointer, draft, vote/critique budgets) was keyed by round only, so
+  logging in as a second student on the same device in the same round showed the
+  first student's locked-in answer. All per-round `localStorage` keys are now
+  suffixed with the identity's nameKey, and switching identity re-inits the round
+  (resets `myPostId`).
 - 2026-06-22 — **Filtered CSV download.** Rounds are now stamped with the active
   **class** and (for lesson-pushed questions) the **lesson** they came from; the
   Manage card gained **Class** + **Lesson (paper)** dropdowns to scope the export

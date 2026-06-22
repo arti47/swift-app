@@ -452,6 +452,15 @@
     }
     function identityRefFor(name) { return db.ref('identities/' + nameKey(name)); }
 
+    // Per-round device state is scoped to the logged-in student, so two students
+    // sharing one iPad in the same round don't see each other's answer/votes.
+    function meKey() { return nameKey(getStudentName() || ''); }
+    function postKeyFor(round) { return 'swift-post-' + round + '-' + meKey(); }
+    function votesLeftKey() { return 'swift-votesleft-' + currentRound + '-' + meKey(); }
+    function critsLeftKey() { return 'swift-critsleft-' + currentRound + '-' + meKey(); }
+    function voteKeyFor(postId) { return 'swift-vote-' + currentRound + '-' + meKey() + '-' + postId; }
+    function critKeyFor(postId) { return 'swift-crit-' + currentRound + '-' + meKey() + '-' + postId; }
+
     // One-time migration: clear the old per-device auto-handle so everyone
     // picks a real identity on the first launch of this version.
     if (!localStorage.getItem('swift-idv2')) {
@@ -542,10 +551,16 @@
         pendingName = null; pendingMode = null;
         hideIdGate();
         updateSwitchLink();
+        // Force a fresh round init for the NEW identity, so we don't inherit the
+        // previous student's submission/draft/votes on this shared device.
+        currentRound = null;
+        myPostId = null;
         applySession();
     }
     function switchStudent() {
         localStorage.removeItem('swift-name');
+        currentRound = null;
+        myPostId = null;
         updateSwitchLink();
         showIdGate();
     }
@@ -600,7 +615,7 @@
         el.addEventListener('input', () => { saveDraft(); updateCounts(); });
     });
 
-    function draftKey() { return 'swift-draft-' + currentRound; }
+    function draftKey() { return 'swift-draft-' + currentRound + '-' + meKey(); }
 
     function saveDraft() {
         if (!currentRound || myPostId) return; // no round, or already locked in
@@ -653,7 +668,7 @@
 
     function startRound() {
         currentRound = session.roundId;
-        myPostId = localStorage.getItem('swift-post-' + currentRound);
+        myPostId = localStorage.getItem(postKeyFor(currentRound));
         expandedPosts.clear();
         latestPosts = {};
 
@@ -683,7 +698,7 @@
     // Redo round: prefill the form with the student's first attempt and
     // show the critiques it received, so they revise instead of retyping.
     function loadRedoContext(origRound, hadDraft) {
-        const oldId = localStorage.getItem('swift-post-' + origRound);
+        const oldId = localStorage.getItem(postKeyFor(origRound));
         if (!oldId) return; // didn't submit in the original round — normal round
         db.ref('posts/' + origRound + '/' + oldId).once('value').then(snap => {
             const old = snap.val();
@@ -787,7 +802,7 @@
         ref.set(newPost)
             .then(() => {
                 myPostId = ref.key;
-                localStorage.setItem('swift-post-' + currentRound, myPostId);
+                localStorage.setItem(postKeyFor(currentRound), myPostId);
                 localStorage.removeItem(draftKey()); // locked in — draft no longer needed
                 updateScreen();
                 window.scrollTo(0, 0);
@@ -804,7 +819,7 @@
         return (session && session.voteLimit != null) ? session.voteLimit : VOTES_PER_ROUND;
     }
     function votesLeft() {
-        const v = localStorage.getItem('swift-votesleft-' + currentRound);
+        const v = localStorage.getItem(votesLeftKey());
         return v === null ? voteLimit() : parseInt(v, 10);
     }
 
@@ -813,7 +828,7 @@
         return (session && session.critLimit != null) ? session.critLimit : 2;
     }
     function critsLeft() {
-        const v = localStorage.getItem('swift-critsleft-' + currentRound);
+        const v = localStorage.getItem(critsLeftKey());
         return v === null ? critLimit() : parseInt(v, 10);
     }
 
@@ -924,7 +939,7 @@
         posts.forEach(post => {
             const mine = post.id === myPostId;
             const isModel = phase === 'podium' && post.id === winnerId;
-            const voted = localStorage.getItem(`swift-vote-${currentRound}-${post.id}`);
+            const voted = localStorage.getItem(voteKeyFor(post.id));
             const critiques = Object.entries(post.critiques || {});
             const open = expandedPosts.has(post.id) || isModel;
             const displayName = anonymous
@@ -933,7 +948,7 @@
 
             const podium = phase === 'podium';
             const canAct = phase === 'vote' && !mine && (voted || left > 0);
-            const critiquedThis = localStorage.getItem(`swift-crit-${currentRound}-${post.id}`);
+            const critiquedThis = localStorage.getItem(critKeyFor(post.id));
             const canCritique = phase === 'vote' && !mine && !critiquedThis && cLeft > 0;
 
             const postEl = document.createElement('div');
@@ -997,18 +1012,18 @@
     function upvote(postId) {
         if (postId === myPostId) return;
         if ((session.phase || '') !== 'vote') return;
-        const voteKey = `swift-vote-${currentRound}-${postId}`;
+        const voteKey = voteKeyFor(postId);
         const left = votesLeft();
         if (localStorage.getItem(voteKey)) {
             // un-vote
             localStorage.removeItem(voteKey);
-            localStorage.setItem('swift-votesleft-' + currentRound, String(left + 1));
+            localStorage.setItem(votesLeftKey(), String(left + 1));
             db.ref(`posts/${currentRound}/${postId}/upvotes`)
               .transaction(v => Math.max(0, (v || 0) - 1));
         } else {
             if (left <= 0) return;
             localStorage.setItem(voteKey, '1');
-            localStorage.setItem('swift-votesleft-' + currentRound, String(left - 1));
+            localStorage.setItem(votesLeftKey(), String(left - 1));
             db.ref(`posts/${currentRound}/${postId}/upvotes`)
               .transaction(v => (v || 0) + 1);
         }
@@ -1024,11 +1039,11 @@
             return;
         }
         // Budget: max one critique per post, limited total per round
-        if (localStorage.getItem(`swift-crit-${currentRound}-${postId}`)) return;
+        if (localStorage.getItem(critKeyFor(postId))) return;
         const cLeft = critsLeft();
         if (cLeft <= 0) { alert('You have used all your critiques for this round.'); return; }
-        localStorage.setItem(`swift-crit-${currentRound}-${postId}`, '1');
-        localStorage.setItem('swift-critsleft-' + currentRound, String(cLeft - 1));
+        localStorage.setItem(critKeyFor(postId), '1');
+        localStorage.setItem(critsLeftKey(), String(cLeft - 1));
         // Clear before the push triggers a re-render, so the submitted
         // text isn't restored into the boxes.
         ['affirm', 'clarify', 'suggest'].forEach(f =>
