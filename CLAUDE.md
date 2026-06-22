@@ -89,6 +89,7 @@ session/current                     # the one live round, or null when idle
   model          { s,w,i,f,t } | null      # teacher's pre-authored model answer (shown at podium)
   showModel      bool                      # podium debrief: flip the projector to the model answer
   endsAt         epoch ms | null           # countdown end, or null = no timer
+  timerMins      number                    # the round's configured minutes (default 3; used by ↺ Reset)
   paused         bool                      # timer paused (teacher live control)
   pauseLeft      ms                        # remaining time captured while paused
   startedAt      server timestamp
@@ -108,6 +109,8 @@ rounds/<roundId>                    # permanent record (survives session changes
   question       string             # prefixed "(Redo) " for redo rounds
   hadImage       bool
   model          { s,w,i,f,t } | null  # teacher's pre-authored model answer (for review.html)
+  class          { slot, name } | null  # active class when pushed (CSV filter; absent on old rounds)
+  lesson         { slot, name }         # lesson it was pushed from (lesson questions only)
   redoOf         roundId            # optional
   awarded        true               # set once podium points are given (guards double-award)
   podium         { first|second|third: {id, name} }   # permanent copy for review.html
@@ -146,10 +149,13 @@ the `identities` path is denied by rules, the app degrades to name-only (no PIN)
 flag clears it so everyone re-picks a real identity on first launch.)*
 
 **Per-device state in `localStorage` (student):** `swift-name` (chosen identity),
-`swift-idv2` (migration flag),
-`swift-post-<roundId>` (their submission id), `swift-votesleft-<roundId>`,
-`swift-vote-<roundId>-<postId>`, `swift-critsleft-<roundId>`,
-`swift-crit-<roundId>-<postId>`, `swift-draft-<roundId>` (auto-saved draft).
+`swift-idv2` (migration flag). All **per-round** keys are **suffixed with the
+identity's nameKey** so two students sharing one iPad in the same round keep
+separate state: `swift-post-<roundId>-<nameKey>` (their submission id),
+`swift-votesleft-<roundId>-<nameKey>`, `swift-vote-<roundId>-<nameKey>-<postId>`,
+`swift-critsleft-<roundId>-<nameKey>`, `swift-crit-<roundId>-<nameKey>-<postId>`,
+`swift-draft-<roundId>-<nameKey>` (auto-saved draft). Switching identity re-inits
+the round for the new student (clears the stale `myPostId`).
 Teacher: `swift-teacher-pin`, `swift-runner-<lessonSlot>` (next-question pointer).
 
 ---
@@ -249,6 +255,31 @@ Ordered roughly by teaching value. Confirm scope with the teacher before buildin
 
 Keep newest first. One line per meaningful change. Dates in YYYY-MM-DD.
 
+- 2026-06-22 — Projector now keeps a compact **"scan to join" QR** on the answer
+  and voting screens (not just the idle screen), so latecomers can join mid-round.
+- 2026-06-22 — **Bugfix: shared-iPad identity switch.** Per-round student state
+  (submission pointer, draft, vote/critique budgets) was keyed by round only, so
+  logging in as a second student on the same device in the same round showed the
+  first student's locked-in answer. All per-round `localStorage` keys are now
+  suffixed with the identity's nameKey, and switching identity re-inits the round
+  (resets `myPostId`).
+- 2026-06-22 — **Filtered CSV download.** Rounds are now stamped with the active
+  **class** and (for lesson-pushed questions) the **lesson** they came from; the
+  Manage card gained **Class** + **Lesson (paper)** dropdowns to scope the export
+  (and it now includes Class/Lesson columns + that class's leaderboard). Old
+  untagged rounds appear only under "All". No new top-level paths (tags nested on
+  `rounds/<id>`).
+- 2026-06-22 — Polish batch: **(a)** timer now **defaults to 3 min** and the Run
+  bar gained a **↺ Reset** button (resets to the round's `timerMins`, default 3).
+  **(b)** Teacher can **🗑 delete a student's answer** from the live feed.
+  **(c)** Student PIN box resized (was oversized). **(d)** During the **vote**
+  phase the student feed **hides peers' vote counts and critiques** (revealed at
+  podium) so voting/feedback stays independent. **(e)** **Un-vote**: tapping an
+  upvoted answer again removes the vote and refunds the budget. **(f)** Podium
+  **validation redesigned**: shows the top 5 answers by votes, each with a
+  place dropdown (🥇 1st +5 / 🥈 2nd +3 / 🥉 3rd +2; top 3 pre-set), instead of
+  one student-picker per slot. **(g)** Projector **model-answer screen now shows
+  the question** above the answer. New `session.timerMins`; no new top-level paths.
 - 2026-06-22 — User-friendliness batch (student + teacher): **(1)** connection
   banner on `index/teacher/projector` — a "🔌 Reconnecting…" bar driven by Firebase
   `.info/connected` (2s debounce) so flaky-wifi drops are obvious. **(2)** live

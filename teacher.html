@@ -354,6 +354,7 @@
                     <button class="mini" id="pauseBtn" onclick="togglePause()">⏸ Pause</button>
                     <button class="mini" onclick="extendTimer(1)">+1m</button>
                     <button class="mini" onclick="extendTimer(2)">+2m</button>
+                    <button class="mini" onclick="resetTimer()">↺ Reset</button>
                 </span>
             </div>
             <div class="primary-actions">
@@ -389,7 +390,7 @@
                     <br><button type="button" style="padding:8px 16px; margin-top:8px;" class="danger" onclick="removeImageRun()">✕ Remove image</button>
                 </div>
                 <label for="qMinutesRun">Timer (minutes, optional — leave blank for none)</label>
-                <input type="number" id="qMinutesRun" min="1" max="60" placeholder="e.g. 5">
+                <input type="number" id="qMinutesRun" min="1" max="60" value="3" placeholder="e.g. 3">
                 <label for="qVoteLimitRun">Votes per student this round</label>
                 <input type="number" id="qVoteLimitRun" min="0" max="10" value="2">
                 <label for="qCritLimitRun">Critiques per student this round</label>
@@ -401,16 +402,8 @@
         <!-- Podium validation panel -->
         <div class="card hidden" id="validatePanel">
             <h2>🏆 Validate the Podium</h2>
-            <p class="muted">Pre-filled with the top 3 by student votes. Swap any slot if a top answer doesn't deserve it, then confirm to award points.</p>
-            <label>🥇 1st place (+5 points)</label>
-            <select id="slotSel1" onchange="updateSlotPreview(1)"></select>
-            <div class="slot-preview" id="slotPrev1"></div>
-            <label>🥈 2nd place (+3 points)</label>
-            <select id="slotSel2" onchange="updateSlotPreview(2)"></select>
-            <div class="slot-preview" id="slotPrev2"></div>
-            <label>🥉 3rd place (+2 points)</label>
-            <select id="slotSel3" onchange="updateSlotPreview(3)"></select>
-            <div class="slot-preview" id="slotPrev3"></div>
+            <p class="muted">The top answers by votes are below (top 3 pre-set). For each, choose its place from the dropdown — leave the rest blank. Each place can go to only one student.</p>
+            <div id="candidateList"></div>
             <div class="controls-row">
                 <button class="goldbtn" onclick="confirmPodium()">✓ Confirm & Reveal Podium</button>
                 <button onclick="document.getElementById('validatePanel').classList.add('hidden')">Cancel</button>
@@ -491,7 +484,7 @@
                 <br><button type="button" style="padding:8px 16px; margin-top:8px;" class="danger" onclick="removeImage()">✕ Remove image</button>
             </div>
             <label for="qMinutes">Timer (minutes, optional — leave blank for none)</label>
-            <input type="number" id="qMinutes" min="1" max="60" placeholder="e.g. 5">
+            <input type="number" id="qMinutes" min="1" max="60" value="3" placeholder="e.g. 3">
             <label for="qVoteLimit">Votes per student this round</label>
             <input type="number" id="qVoteLimit" min="0" max="10" value="2">
             <label for="qCritLimit">Critiques per student this round</label>
@@ -534,7 +527,12 @@
 
         <div class="card">
             <h2>🗄 Manage</h2>
-            <button class="greenbtn" style="width:100%;" onclick="exportCSV()">⬇️ Download All Responses (CSV)</button>
+            <label for="exportClass">Download responses — class</label>
+            <select id="exportClass"></select>
+            <label for="exportLesson">Lesson (paper)</label>
+            <select id="exportLesson"></select>
+            <p class="muted" style="text-align:left; font-size:13px; margin:6px 0 0;">Filters apply to rounds pushed after this update; older rounds are untagged and only appear under "All".</p>
+            <button class="greenbtn" style="width:100%;" onclick="exportCSV()">⬇️ Download Responses (CSV)</button>
 
             <div class="danger-zone">
                 <h3>⚠️ Danger zone</h3>
@@ -730,6 +728,7 @@
             return `<option value="${i}">${i}. ${c && c.name ? esc(c.name) : '(empty)'}</option>`;
         }).join('');
         sel.value = cur;
+        populateExportFilters();
     }
 
     function loadClassSlot() {
@@ -827,6 +826,7 @@
 
         renderLessonQs();
         renderRunLesson();
+        populateExportFilters();
     }
 
     function lessonSlotChanged() {
@@ -886,7 +886,7 @@
 
     function clearComposeBox() {
         document.getElementById('qText').value = '';
-        document.getElementById('qMinutes').value = '';
+        document.getElementById('qMinutes').value = '3';
         document.getElementById('qVoteLimit').value = '2';
         document.getElementById('qCritLimit').value = '3';
         setModelForm(null);
@@ -1023,12 +1023,15 @@
             critLimit: ql.crit != null ? ql.crit : 3,
             model: ql.model || null,
             endsAt: ql.mins > 0 ? Date.now() + ql.mins * 60000 : null,
+            timerMins: ql.mins > 0 ? ql.mins : 3,
             startedAt: firebase.database.ServerValue.TIMESTAMP
         });
         db.ref('rounds/' + roundId).set({
             question: ql.q,
             hadImage: !!ql.image,
             model: ql.model || null,
+            class: classTag(),
+            lesson: { slot: String(slot), name: (lessons[slot] && lessons[slot].name) || ('Lesson ' + slot) },
             startedAt: firebase.database.ServerValue.TIMESTAMP
         });
         localStorage.setItem(nextIdxKey(slot), String(i + 1));
@@ -1241,18 +1244,20 @@
             critLimit: isNaN(critLimit) ? 3 : critLimit,
             model: null,
             endsAt: mins > 0 ? Date.now() + mins * 60000 : null,
+            timerMins: mins > 0 ? mins : 3,
             startedAt: firebase.database.ServerValue.TIMESTAMP
         });
         // Permanent record so the CSV export can pair answers with questions
         db.ref('rounds/' + roundId).set({
             question: questionText,
             hadImage: !!questionImageRun,
+            class: classTag(),
             startedAt: firebase.database.ServerValue.TIMESTAMP
         });
 
         // Clear the quick-push box for the next one
         document.getElementById('qTextRun').value = '';
-        document.getElementById('qMinutesRun').value = '';
+        document.getElementById('qMinutesRun').value = '3';
         document.getElementById('qVoteLimitRun').value = '2';
         document.getElementById('qCritLimitRun').value = '3';
         removeImageRun();
@@ -1272,6 +1277,11 @@
         const cur = sessionData.endsAt;
         const base = (cur && cur > Date.now()) ? cur : Date.now();
         db.ref('session/current/endsAt').set(base + mins * 60000);
+    }
+    function resetTimer() {
+        if (!sessionData || !sessionData.roundId) return;
+        const mins = sessionData.timerMins || 3;
+        db.ref('session/current').update({ endsAt: Date.now() + mins * 60000, paused: false, pauseLeft: null });
     }
     function togglePause() {
         if (!sessionData || !sessionData.roundId) return;
@@ -1302,6 +1312,7 @@
             critLimit: sessionData.critLimit != null ? sessionData.critLimit : 3,
             model: sessionData.model || null,
             endsAt: null,
+            timerMins: sessionData.timerMins || 3,
             redoOf: origin,
             startedAt: firebase.database.ServerValue.TIMESTAMP
         });
@@ -1309,6 +1320,7 @@
             question: '(Redo) ' + sessionData.question,
             hadImage: !!sessionData.image,
             model: sessionData.model || null,
+            class: classTag(),
             redoOf: origin,
             startedAt: firebase.database.ServerValue.TIMESTAMP
         });
@@ -1318,6 +1330,14 @@
     function toggleSpotlight(postId) {
         const cur = sessionData && sessionData.spotlight;
         db.ref('session/current/spotlight').set(cur === postId ? null : postId);
+    }
+
+    // ---- Delete a student's answer (e.g. inappropriate or a duplicate) ----
+    function deletePost(postId) {
+        const p = latestPosts[postId];
+        if (!confirm(`Delete ${p && p.name ? '"' + p.name + '"' : 'this'} answer? This removes it for everyone and can't be undone.`)) return;
+        if (sessionData && sessionData.spotlight === postId) db.ref('session/current/spotlight').set(null);
+        db.ref(`posts/${currentRound}/${postId}`).remove();
     }
 
     // ---- Flip the projector to the model answer (podium debrief) ----
@@ -1345,6 +1365,10 @@
     function scoresPath() {
         return 'scores/' + (activeClass && activeClass.slot ? 'c' + activeClass.slot : 'default');
     }
+    // Stamp on each round so the CSV export can filter by class / lesson.
+    function classTag() {
+        return activeClass ? { slot: String(activeClass.slot), name: activeClass.name } : null;
+    }
     function addPoints(name, pts) {
         db.ref(scoresPath() + '/' + scoreKey(name)).transaction(cur => ({
             name: name,
@@ -1360,24 +1384,14 @@
     }
 
     // ---- Validation panel + podium ----
-    function postOptions(selectedId) {
-        const sorted = Object.entries(latestPosts)
-            .map(([id, p]) => ({ id, ...p }))
-            .sort((a, b) => (b.upvotes || 0) - (a.upvotes || 0));
-        return sorted.map(p =>
-            `<option value="${p.id}" ${p.id === selectedId ? 'selected' : ''}>` +
-            `${esc(p.name)} — 👍 ${p.upvotes || 0}</option>`).join('');
-    }
+    // The teacher is shown the top candidates by votes and assigns each a place
+    // (1st/2nd/3rd) via a dropdown; the top 3 are pre-selected.
+    const CANDIDATE_N = 5;
+    let candidateIds = [];
 
-    function updateSlotPreview(n) {
-        const id = document.getElementById('slotSel' + n).value;
-        const post = latestPosts[id];
-        const prev = document.getElementById('slotPrev' + n);
-        if (!post) { prev.innerHTML = ''; return; }
-        const critCount = Object.keys(post.critiques || {}).length;
-        prev.innerHTML = `
-            <div class="pv-meta">👍 ${post.upvotes || 0} votes · 💬 ${critCount} critiques</div>
-            ${renderDims(post)}`;
+    function placeOptions(selected) {
+        const opts = [['', '—'], ['1', '🥇 1st Place (+5)'], ['2', '🥈 2nd Place (+3)'], ['3', '🥉 3rd Place (+2)']];
+        return opts.map(([v, l]) => `<option value="${v}" ${v === selected ? 'selected' : ''}>${l}</option>`).join('');
     }
 
     function showValidation() {
@@ -1385,18 +1399,39 @@
             .map(([id, p]) => ({ id, ...p }))
             .sort((a, b) => (b.upvotes || 0) - (a.upvotes || 0));
         if (sorted.length < 3) { alert('Need at least 3 submissions to build a podium.'); return; }
-        document.getElementById('slotSel1').innerHTML = postOptions(sorted[0].id);
-        document.getElementById('slotSel2').innerHTML = postOptions(sorted[1].id);
-        document.getElementById('slotSel3').innerHTML = postOptions(sorted[2].id);
-        [1, 2, 3].forEach(updateSlotPreview);
+        const cands = sorted.slice(0, CANDIDATE_N);
+        candidateIds = cands.map(p => p.id);
+        const presets = { 0: '1', 1: '2', 2: '3' };
+        document.getElementById('candidateList').innerHTML = cands.map((p, i) => {
+            const critCount = Object.keys(p.critiques || {}).length;
+            return `<div class="slot-preview">
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+                    <strong>${esc(p.name)}</strong>
+                    <select id="placeSel-${p.id}" style="width:auto;">${placeOptions(presets[i] || '')}</select>
+                </div>
+                <div class="pv-meta">👍 ${p.upvotes || 0} votes · 💬 ${critCount} critiques</div>
+                ${renderDims(p)}
+            </div>`;
+        }).join('');
         document.getElementById('validatePanel').classList.remove('hidden');
         document.getElementById('validatePanel').scrollIntoView({ behavior: 'smooth' });
     }
 
     function confirmPodium() {
-        const ids = ['slotSel1', 'slotSel2', 'slotSel3']
-            .map(id => document.getElementById(id).value);
-        if (new Set(ids).size !== 3) { alert('The three podium places must be three different students.'); return; }
+        const counts = {};
+        const byPlace = {};
+        candidateIds.forEach(id => {
+            const sel = document.getElementById('placeSel-' + id);
+            const v = sel ? sel.value : '';
+            if (v) { counts[v] = (counts[v] || 0) + 1; byPlace[v] = id; }
+        });
+        if (counts['1'] > 1 || counts['2'] > 1 || counts['3'] > 1) {
+            alert('Each place (1st / 2nd / 3rd) can only be given to one student.'); return;
+        }
+        if (!byPlace['1'] || !byPlace['2'] || !byPlace['3']) {
+            alert('Please assign all three places: 1st, 2nd and 3rd.'); return;
+        }
+        const ids = [byPlace['1'], byPlace['2'], byPlace['3']];
 
         db.ref('rounds/' + currentRound + '/awarded').once('value').then(snap => {
             if (snap.val()) { alert('Points were already awarded for this round.'); return; }
@@ -1660,6 +1695,7 @@
                         <button class="spot-btn${spotOn ? ' on' : ''}" onclick="toggleSpotlight('${post.id}')">
                             ${spotOn ? '📺 On screen — stop' : '📺 Spotlight'}
                         </button>
+                        <button class="spot-btn" style="border-color:#f87171; color:#f87171;" onclick="deletePost('${post.id}')" title="Delete this answer">🗑</button>
                         <span class="votes">👍 ${post.upvotes || 0}</span>
                     </span>
                 </div>
@@ -1715,22 +1751,60 @@
         }).join('');
     }
 
-    // ---- CSV export: every round + final scores ----
+    // Populate the export class/lesson dropdowns (called as data loads).
+    function populateExportFilters() {
+        const cSel = document.getElementById('exportClass');
+        if (cSel) {
+            const cur = cSel.value || 'all';
+            let html = '<option value="all">All classes</option>';
+            [1, 2, 3, 4, 5, 6].forEach(i => {
+                const c = classesData[i];
+                if (c && c.name) html += `<option value="${i}">${esc(c.name)}</option>`;
+            });
+            cSel.innerHTML = html; cSel.value = cur;
+        }
+        const lSel = document.getElementById('exportLesson');
+        if (lSel) {
+            const cur = lSel.value || 'all';
+            let html = '<option value="all">All lessons</option><option value="none">Ad-hoc (no lesson)</option>';
+            for (let i = 1; i <= 10; i++) {
+                const L = lessons[i];
+                if (L && L.name) html += `<option value="${i}">${esc(L.name)}</option>`;
+            }
+            lSel.innerHTML = html; lSel.value = cur;
+        }
+    }
+
+    // ---- CSV export: filtered by class / lesson, plus that class's scores ----
     function exportCSV() {
+        const classFilter = (document.getElementById('exportClass') || {}).value || 'all';
+        const lessonFilter = (document.getElementById('exportLesson') || {}).value || 'all';
+        const scorePath = classFilter !== 'all' ? 'scores/c' + classFilter : scoresPath();
+
         Promise.all([
             db.ref('rounds').once('value'),
             db.ref('posts').once('value'),
-            db.ref(scoresPath()).once('value')
+            db.ref(scorePath).once('value')
         ]).then(([rSnap, pSnap, sSnap]) => {
             const rounds = rSnap.val() || {};
             const allPosts = pSnap.val() || {};
             const scores = Object.values(sSnap.val() || {}).sort((a, b) => b.points - a.points);
-            const roundIds = Object.keys(allPosts).sort();
-            if (!roundIds.length) { alert('No responses in the database yet.'); return; }
+
+            const matches = rid => {
+                const meta = rounds[rid] || {};
+                const okClass = classFilter === 'all' ||
+                    (meta.class && String(meta.class.slot) === classFilter);
+                const okLesson = lessonFilter === 'all' ||
+                    (lessonFilter === 'none' ? !meta.lesson
+                        : (meta.lesson && String(meta.lesson.slot) === lessonFilter));
+                return okClass && okLesson;
+            };
+            const roundIds = Object.keys(allPosts).sort().filter(matches);
+            if (!roundIds.length) { alert('No responses match that class / lesson filter.'); return; }
 
             const cell = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
             const rows = [[
-                'Question #', 'Date', 'Question', 'Student',
+                'Question #', 'Date', 'Class', 'Lesson', 'Question', 'Student',
                 'S — Number of Setups', 'W — Command Word', 'I — Idea of Science',
                 'F — Facts / Data', 'T — Tally the Marks',
                 'Upvotes', 'Critiques received'
@@ -1740,12 +1814,14 @@
                 const meta = rounds[rid] || {};
                 const ts = meta.startedAt || parseInt(rid.slice(1), 10);
                 const date = isNaN(ts) ? '' : new Date(ts).toLocaleString();
+                const className = meta.class ? meta.class.name : '';
+                const lessonName = meta.lesson ? meta.lesson.name : '';
                 Object.values(allPosts[rid] || {}).forEach(p => {
                     const crits = Object.values(p.critiques || {})
                         .map(c => `${c.starred ? '⭐ ' : ''}${c.by} — Affirm: ${c.affirm} / Clarify: ${c.clarify} / Suggest: ${c.suggest}`)
                         .join('  ||  ');
                     rows.push([
-                        idx + 1, date, meta.question || '(question not recorded)',
+                        idx + 1, date, className, lessonName, meta.question || '(question not recorded)',
                         p.name, p.s, p.w, p.i, p.f, p.t,
                         p.upvotes || 0, crits
                     ].map(cell).join(','));
@@ -1754,7 +1830,7 @@
 
             if (scores.length) {
                 rows.push('');
-                rows.push([cell('SESSION LEADERBOARD'), cell('Points')].join(','));
+                rows.push([cell('LEADERBOARD'), cell('Points')].join(','));
                 scores.forEach(s => rows.push([cell(s.name), cell(s.points)].join(',')));
             }
 
