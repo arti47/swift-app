@@ -54,10 +54,11 @@
         .bigemoji { font-size: 90px; animation: bob 2s ease-in-out infinite; display: inline-block; }
         @keyframes bob { 50% { transform: translateY(-10px); } }
         .sub { color: var(--muted); font-size: 24px; }
-        .qr img { background: white; padding: 12px; border-radius: 14px; }
         .url { font-size: 22px; color: var(--primary); margin-top: 10px; }
+        .qrbox { display: inline-block; background: #fff; padding: 12px; border-radius: 14px; line-height: 0; }
+        .qrbox img, .qrbox canvas { display: block; }
         .join-mini { display: flex; align-items: center; justify-content: center; gap: 24px; }
-        .join-mini img { background: white; padding: 8px; border-radius: 12px; }
+        .join-mini .qrbox { padding: 8px; border-radius: 12px; }
         .join-mini .join-text { text-align: left; }
         .join-mini .sub { font-size: 22px; }
         .join-mini .url { font-size: 18px; margin-top: 4px; }
@@ -127,7 +128,7 @@
         <div class="card qr">
             <div class="bigemoji">📱</div>
             <p class="sub">Scan to join</p>
-            <img id="qrImg" width="280" height="280" alt="QR code">
+            <div id="qrImg" class="qrbox"></div>
             <div class="url" id="studentUrl"></div>
         </div>
     </div>
@@ -143,7 +144,7 @@
             </div>
         </div>
         <div class="card join-mini">
-            <img id="qrMiniA" width="150" height="150" alt="Join QR">
+            <div id="qrMiniA" class="qrbox"></div>
             <div class="join-text"><div class="sub">📱 Scan to join</div><div class="url" id="urlMiniA"></div></div>
         </div>
     </div>
@@ -160,7 +161,7 @@
             </div>
         </div>
         <div class="card join-mini">
-            <img id="qrMiniV" width="150" height="150" alt="Join QR">
+            <div id="qrMiniV" class="qrbox"></div>
             <div class="join-text"><div class="sub">📱 Scan to join</div><div class="url" id="urlMiniV"></div></div>
         </div>
     </div>
@@ -205,6 +206,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script src="firebase-config.js"></script>
+<script src="qrcode.min.js"></script>
 <script>
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
@@ -232,15 +234,19 @@
     }
 
     const studentUrl = window.location.href.replace(/projector\.html.*$/, '');
-    const qrSrc = size => 'https://api.qrserver.com/v1/create-qr-code/?size=' +
-        size + 'x' + size + '&data=' + encodeURIComponent(studentUrl);
-    document.getElementById('qrImg').src = qrSrc(280);
-    // Keep a compact join QR on the answer & voting screens for latecomers.
+    // QR is generated locally (vendored qrcode.min.js, same origin) so it works
+    // even on networks that block third-party image services.
+    function makeQR(id, size) {
+        const el = document.getElementById(id);
+        if (!el || typeof QRCode === 'undefined') return;
+        el.innerHTML = '';
+        new QRCode(el, { text: studentUrl, width: size, height: size, correctLevel: QRCode.CorrectLevel.M });
+    }
+    makeQR('qrImg', 280);
+    makeQR('qrMiniA', 150);
+    makeQR('qrMiniV', 150);
     ['urlMiniA', 'urlMiniV', 'studentUrl'].forEach(id => {
         const el = document.getElementById(id); if (el) el.textContent = studentUrl;
-    });
-    ['qrMiniA', 'qrMiniV'].forEach(id => {
-        const el = document.getElementById(id); if (el) el.src = qrSrc(150);
     });
 
     const DIMS = [

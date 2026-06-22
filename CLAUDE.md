@@ -67,6 +67,7 @@ cleverness.
 | `projector.html` | **Read-only classroom display** (the big screen). Phase-aware, **anonymity-safe** (never shows names during voting), runs the podium reveal + standings, shows spotlighted answers, and (teacher-triggered at podium) the full-screen model answer for debrief. No PIN. |
 | `review.html` | **Student revision book.** Pick a name → enter that student's PIN (if set) → see all past answers, feedback received, and model answers; print/save-as-PDF. |
 | `firebase-config.js` | Firebase project config (shared by all pages). Contains the teacher's real keys. |
+| `qrcode.min.js` | Vendored MIT QR generator (davidshimjs/qrcodejs). Used by `teacher.html` + `projector.html` to render the join QR **locally** (same-origin) — no third-party image service. Must be deployed with the folder. |
 | `CLAUDE.md` | This file. |
 | `.claude/launch.json` | Local preview-server config for testing. |
 
@@ -271,6 +272,10 @@ Keep newest first. One line per meaningful change. Dates in YYYY-MM-DD.
   on the student device (audio unlocked by their own tap). **(8)** CSV export now
   includes the **self-check (✅/🔧)** columns per dimension. **(10)** student
   **🔠 bigger-text** accessibility toggle (`swift-textsize`). No new top-level paths.
+- 2026-06-22 — **QR codes now generated locally** (vendored `qrcode.min.js`,
+  same-origin) on `teacher.html` + `projector.html`, replacing the external
+  `api.qrserver.com` image service that was blocked on the school network (QR
+  showed blank). New file must be deployed with the folder. No data-model change.
 - 2026-06-22 — Projector now keeps a compact **"scan to join" QR** on the answer
   and voting screens (not just the idle screen), so latecomers can join mid-round.
 - 2026-06-22 — **Bugfix: shared-iPad identity switch.** Per-round student state
