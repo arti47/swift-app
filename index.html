@@ -643,16 +643,19 @@
     function toggleStuck() {
         if (!currentRound) return;
         const key = meKey();
-        const ref = ref('session/current/stuck/' + key);
+        const stuckRef = ref('session/current/stuck/' + key);
         const on = session && session.stuck && session.stuck[key];
-        if (on) ref.remove(); else ref.set(getStudentName() || 'someone');
+        if (on) stuckRef.remove(); else stuckRef.set(getStudentName() || 'someone');
+        setStuckBtn(!on); // instant feedback; the DB listener will reconcile
     }
-    function renderStuck() {
+    function setStuckBtn(on) {
         const btn = document.getElementById('stuckBtn');
         if (!btn) return;
-        const on = session && session.stuck && session.stuck[meKey()];
         btn.classList.toggle('on', !!on);
         btn.textContent = on ? "🙋 Stuck — teacher notified (tap to clear)" : '🙋 I\'m stuck';
+    }
+    function renderStuck() {
+        setStuckBtn(session && session.stuck && session.stuck[meKey()]);
     }
 
     // ---- Personal standing: this student's points & rank in the class ----
@@ -815,6 +818,19 @@
         postsRef = ref('posts/' + currentRound);
         postsRef.on('value', snap => {
             latestPosts = snap.val() || {};
+            // Identity follows the student across devices: if this name already
+            // locked in an answer this round (e.g. on another iPad), adopt it so
+            // we show the locked/voting state instead of a blank form (and never
+            // submit a duplicate).
+            if (!myPostId) {
+                const mine = Object.entries(latestPosts)
+                    .find(([id, p]) => nameKey(p.name) === meKey());
+                if (mine) {
+                    myPostId = mine[0];
+                    localStorage.setItem(postKeyFor(currentRound), myPostId);
+                    localStorage.removeItem(draftKey());
+                }
+            }
             updateScreen();
         });
         window.scrollTo(0, 0);
@@ -924,10 +940,10 @@
             submittedAt: firebase.database.ServerValue.TIMESTAMP
         };
 
-        const ref = ref('posts/' + currentRound).push();
-        ref.set(newPost)
+        const postRef = ref('posts/' + currentRound).push();
+        postRef.set(newPost)
             .then(() => {
-                myPostId = ref.key;
+                myPostId = postRef.key;
                 localStorage.setItem(postKeyFor(currentRound), myPostId);
                 localStorage.removeItem(draftKey()); // locked in — draft no longer needed
                 ref('session/current/stuck/' + meKey()).remove(); // no longer stuck
