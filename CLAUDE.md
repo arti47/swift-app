@@ -116,6 +116,7 @@ posts/<roundId>/<pushId>            # one student submission
   name           string (auto-handle, e.g. "Falcon-7")
   s,w,i,f,t      string  (the 5 dimensions)
   upvotes        number
+  voters         { nameKey: true }   # who upvoted (enforces 1 vote/student across devices)
   submittedAt    server timestamp
   selfcheck      { s|w|i|f|t: "ok"|"fix" }  # student's self-comparison vs model
   critiques/<id> { by, affirm, clarify, suggest, starred? }
@@ -123,6 +124,7 @@ posts/<roundId>/<pushId>            # one student submission
 rounds/<roundId>                    # permanent record (survives session changes)
   question       string             # prefixed "(Redo) " for redo rounds
   hadImage       bool
+  image          data-URL | null    # the question image, persisted for review.html / past-questions / model debrief
   model          { s,w,i,f,t } | null  # teacher's pre-authored model answer (for review.html)
   class          { slot, name } | null  # active class when pushed (CSV filter; absent on old rounds)
   lesson         { slot, name }         # lesson it was pushed from (lesson questions only)
@@ -269,6 +271,11 @@ Ordered roughly by teaching value. Confirm scope with the teacher before buildin
 ## 9. Changelog
 
 Keep newest first. One line per meaningful change. Dates in YYYY-MM-DD.
+
+- 2026-06-22 — Timer now arrives **ready-but-paused at its full duration**
+  (default 3 min) when a question is pushed, instead of auto-running. The Run-bar
+  button is a single **▶ Start ⇄ ⏸ Pause** toggle; **↺ Reset** returns to the full
+  duration, paused. Push/redo set `paused:true, pauseLeft:timerMins*60000`.
 
 - 2026-06-22 — Teacher console header now shows **Room: <code>** and a **🚪 Log out**
   link (clears the cached room + PIN on this device, returns to the room-login
