@@ -271,6 +271,11 @@ Ordered roughly by teaching value. Confirm scope with the teacher before buildin
 
 Keep newest first. One line per meaningful change. Dates in YYYY-MM-DD.
 
+- 2026-06-22 — Timer now arrives **ready-but-paused at its full duration**
+  (default 3 min) when a question is pushed, instead of auto-running. The Run-bar
+  button is a single **▶ Start ⇄ ⏸ Pause** toggle; **↺ Reset** returns to the full
+  duration, paused. Push/redo set `paused:true, pauseLeft:timerMins*60000`.
+
 - 2026-06-22 — Teacher console header now shows **Room: <code>** and a **🚪 Log out**
   link (clears the cached room + PIN on this device, returns to the room-login
   screen — for shared laptops / switching rooms).

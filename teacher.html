@@ -1105,8 +1105,12 @@
             voteLimit: ql.vote != null ? ql.vote : 2,
             critLimit: ql.crit != null ? ql.crit : 3,
             model: ql.model || null,
-            endsAt: ql.mins > 0 ? Date.now() + ql.mins * 60000 : null,
+            // Timer arrives ready but PAUSED at its full duration (default 3 min);
+            // the teacher taps ▶ Start to begin the countdown.
+            endsAt: null,
             timerMins: ql.mins > 0 ? ql.mins : 3,
+            paused: true,
+            pauseLeft: (ql.mins > 0 ? ql.mins : 3) * 60000,
             startedAt: firebase.database.ServerValue.TIMESTAMP
         });
         ref('rounds/' + roundId).set({
@@ -1326,8 +1330,10 @@
             voteLimit: isNaN(voteLimit) ? 2 : voteLimit,
             critLimit: isNaN(critLimit) ? 3 : critLimit,
             model: null,
-            endsAt: mins > 0 ? Date.now() + mins * 60000 : null,
+            endsAt: null,
             timerMins: mins > 0 ? mins : 3,
+            paused: true,
+            pauseLeft: (mins > 0 ? mins : 3) * 60000,
             startedAt: firebase.database.ServerValue.TIMESTAMP
         });
         // Permanent record so the CSV export can pair answers with questions
@@ -1383,20 +1389,23 @@
         const base = (cur && cur > Date.now()) ? cur : Date.now();
         ref('session/current/endsAt').set(base + mins * 60000);
     }
+    // ↺ Reset returns the clock to its full duration, paused/ready (tap Start to run).
     function resetTimer() {
         if (!sessionData || !sessionData.roundId) return;
         const mins = sessionData.timerMins || 3;
-        ref('session/current').update({ endsAt: Date.now() + mins * 60000, paused: false, pauseLeft: null });
+        ref('session/current').update({ endsAt: null, paused: true, pauseLeft: mins * 60000 });
     }
+    // One button: Start when the clock isn't running, Pause when it is.
     function togglePause() {
         if (!sessionData || !sessionData.roundId) return;
-        if (sessionData.paused) { // resume
-            const left = sessionData.pauseLeft != null ? sessionData.pauseLeft : 0;
-            ref('session/current').update({ paused: false, endsAt: Date.now() + left, pauseLeft: null });
-        } else {
-            if (!sessionData.endsAt) { alert('No timer running to pause. Use +1m / +2m to start one.'); return; }
+        const running = sessionData.endsAt && !sessionData.paused;
+        if (running) { // pause
             const left = Math.max(0, sessionData.endsAt - Date.now());
             ref('session/current').update({ paused: true, pauseLeft: left });
+        } else { // start / resume
+            const left = sessionData.pauseLeft != null
+                ? sessionData.pauseLeft : (sessionData.timerMins || 3) * 60000;
+            ref('session/current').update({ paused: false, endsAt: Date.now() + left, pauseLeft: null });
         }
     }
 
@@ -1418,6 +1427,8 @@
             model: sessionData.model || null,
             endsAt: null,
             timerMins: sessionData.timerMins || 3,
+            paused: true,
+            pauseLeft: (sessionData.timerMins || 3) * 60000,
             redoOf: origin,
             startedAt: firebase.database.ServerValue.TIMESTAMP
         });
@@ -1634,8 +1645,8 @@
         // Timer controls: available whenever a round is live (answer/vote)
         const tc = document.getElementById('timerControls');
         tc.classList.toggle('hidden', !(phase === 'answer' || phase === 'vote'));
-        const paused = !!(sessionData && sessionData.paused);
-        document.getElementById('pauseBtn').textContent = paused ? '▶ Resume' : '⏸ Pause';
+        const running = !!(sessionData && sessionData.endsAt && !sessionData.paused);
+        document.getElementById('pauseBtn').textContent = running ? '⏸ Pause' : '▶ Start';
 
         // Model-on-projector toggle: only at podium
         const mp = document.getElementById('modelProjBtn');
