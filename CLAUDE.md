@@ -124,6 +124,7 @@ posts/<roundId>/<pushId>            # one student submission
 rounds/<roundId>                    # permanent record (survives session changes)
   question       string             # prefixed "(Redo) " for redo rounds
   hadImage       bool
+  image          data-URL | null    # the question image, persisted for review.html / past-questions / model debrief
   model          { s,w,i,f,t } | null  # teacher's pre-authored model answer (for review.html)
   class          { slot, name } | null  # active class when pushed (CSV filter; absent on old rounds)
   lesson         { slot, name }         # lesson it was pushed from (lesson questions only)

@@ -177,6 +177,7 @@
     <div id="scrModel" class="hidden">
         <div class="spot-title" id="modelTitle">🎯 Model Answer</div>
         <div class="question-banner" id="modelQuestion" style="font-size:26px;"></div>
+        <div class="card hidden question-image" id="modelImgWrap" style="padding:6px; margin-bottom:14px;"><img id="modelImg" style="max-height:24vh;" alt=""></div>
         <div class="card spot-card" id="modelDims"></div>
     </div>
 
@@ -360,6 +361,9 @@
     // Prefer the teacher's pre-authored model; fall back to the crowned answer.
     function renderModelScreen() {
         document.getElementById('modelQuestion').textContent = session.question || '';
+        const imgWrap = document.getElementById('modelImgWrap');
+        if (session.image) { document.getElementById('modelImg').src = session.image; imgWrap.classList.remove('hidden'); }
+        else imgWrap.classList.add('hidden');
         const model = (session.model && DIMS.some(([k]) => session.model[k])) ? session.model : null;
         const champ = session.podium && latestPosts[session.podium.first.id];
         if (model) {

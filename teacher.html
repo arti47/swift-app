@@ -1116,6 +1116,7 @@
         ref('rounds/' + roundId).set({
             question: ql.q,
             hadImage: !!ql.image,
+            image: ql.image || null,   // persist so review.html / past-questions can show it
             model: ql.model || null,
             class: classTag(),
             lesson: { slot: String(slot), name: (lessons[slot] && lessons[slot].name) || ('Lesson ' + slot) },
@@ -1340,6 +1341,7 @@
         ref('rounds/' + roundId).set({
             question: questionText,
             hadImage: !!questionImageRun,
+            image: questionImageRun || null,
             class: classTag(),
             startedAt: firebase.database.ServerValue.TIMESTAMP
         });
@@ -1435,6 +1437,7 @@
         ref('rounds/' + roundId).set({
             question: '(Redo) ' + sessionData.question,
             hadImage: !!sessionData.image,
+            image: sessionData.image || null,
             model: sessionData.model || null,
             class: classTag(),
             redoOf: origin,
@@ -2011,6 +2014,9 @@
         const meta = historyRounds[id] || {};
         const posts = Object.values(historyPosts[id] || {}).sort((a, b) => (b.upvotes || 0) - (a.upvotes || 0));
         let html = `<div class="question-banner" style="font-size:18px;">${esc(meta.question || '(question not recorded)')}</div>`;
+        if (meta.image) {
+            html += `<div style="text-align:center; margin-bottom:12px;"><img src="${meta.image}" style="max-width:100%; max-height:320px; border-radius:8px;"></div>`;
+        }
         if (meta.podium) {
             html += `<p class="muted">🥇 ${esc(meta.podium.first.name)} &nbsp; 🥈 ${esc(meta.podium.second.name)} &nbsp; 🥉 ${esc(meta.podium.third.name)}</p>`;
         }
