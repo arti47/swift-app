@@ -243,7 +243,8 @@
         return div.innerHTML;
     }
 
-    const studentUrl = window.location.href.replace(/projector\.html.*$/, '');
+    // Join URL must carry this room's code so students land in the right room.
+    const studentUrl = window.location.href.replace(/projector\.html.*$/, '') + '?room=' + room;
     // QR is generated locally (vendored qrcode.min.js, same origin) so it works
     // even on networks that block third-party image services.
     function makeQR(id, size) {

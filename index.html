@@ -643,9 +643,9 @@
     function toggleStuck() {
         if (!currentRound) return;
         const key = meKey();
-        const ref = ref('session/current/stuck/' + key);
+        const stuckRef = ref('session/current/stuck/' + key);
         const on = session && session.stuck && session.stuck[key];
-        if (on) ref.remove(); else ref.set(getStudentName() || 'someone');
+        if (on) stuckRef.remove(); else stuckRef.set(getStudentName() || 'someone');
     }
     function renderStuck() {
         const btn = document.getElementById('stuckBtn');
@@ -924,10 +924,10 @@
             submittedAt: firebase.database.ServerValue.TIMESTAMP
         };
 
-        const ref = ref('posts/' + currentRound).push();
-        ref.set(newPost)
+        const postRef = ref('posts/' + currentRound).push();
+        postRef.set(newPost)
             .then(() => {
-                myPostId = ref.key;
+                myPostId = postRef.key;
                 localStorage.setItem(postKeyFor(currentRound), myPostId);
                 localStorage.removeItem(draftKey()); // locked in — draft no longer needed
                 ref('session/current/stuck/' + meKey()).remove(); // no longer stuck
