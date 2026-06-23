@@ -818,6 +818,19 @@
         postsRef = ref('posts/' + currentRound);
         postsRef.on('value', snap => {
             latestPosts = snap.val() || {};
+            // Identity follows the student across devices: if this name already
+            // locked in an answer this round (e.g. on another iPad), adopt it so
+            // we show the locked/voting state instead of a blank form (and never
+            // submit a duplicate).
+            if (!myPostId) {
+                const mine = Object.entries(latestPosts)
+                    .find(([id, p]) => nameKey(p.name) === meKey());
+                if (mine) {
+                    myPostId = mine[0];
+                    localStorage.setItem(postKeyFor(currentRound), myPostId);
+                    localStorage.removeItem(draftKey());
+                }
+            }
             updateScreen();
         });
         window.scrollTo(0, 0);
