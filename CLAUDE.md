@@ -116,6 +116,7 @@ posts/<roundId>/<pushId>            # one student submission
   name           string (auto-handle, e.g. "Falcon-7")
   s,w,i,f,t      string  (the 5 dimensions)
   upvotes        number
+  voters         { nameKey: true }   # who upvoted (enforces 1 vote/student across devices)
   submittedAt    server timestamp
   selfcheck      { s|w|i|f|t: "ok"|"fix" }  # student's self-comparison vs model
   critiques/<id> { by, affirm, clarify, suggest, starred? }
