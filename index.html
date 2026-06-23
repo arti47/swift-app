@@ -646,13 +646,16 @@
         const stuckRef = ref('session/current/stuck/' + key);
         const on = session && session.stuck && session.stuck[key];
         if (on) stuckRef.remove(); else stuckRef.set(getStudentName() || 'someone');
+        setStuckBtn(!on); // instant feedback; the DB listener will reconcile
     }
-    function renderStuck() {
+    function setStuckBtn(on) {
         const btn = document.getElementById('stuckBtn');
         if (!btn) return;
-        const on = session && session.stuck && session.stuck[meKey()];
         btn.classList.toggle('on', !!on);
         btn.textContent = on ? "🙋 Stuck — teacher notified (tap to clear)" : '🙋 I\'m stuck';
+    }
+    function renderStuck() {
+        setStuckBtn(session && session.stuck && session.stuck[meKey()]);
     }
 
     // ---- Personal standing: this student's points & rank in the class ----
