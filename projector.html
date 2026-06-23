@@ -21,12 +21,12 @@
             background: var(--bg);
             color: var(--text);
             margin: 0;
-            padding: 30px;
+            padding: 18px 30px;
             overflow: hidden;
         }
         .container { max-width: 1100px; margin: 0 auto; text-align: center; }
         .hidden { display: none !important; }
-        h1 { font-size: 56px; letter-spacing: 2px; margin: 10px 0 30px; }
+        h1 { font-size: 44px; letter-spacing: 2px; margin: 4px 0 16px; }
         h1 .spark { color: var(--gold); }
         .card {
             background: var(--card);
@@ -38,19 +38,23 @@
         .question-banner {
             background: linear-gradient(135deg, #1e293b, #312e81);
             border: 1px solid #4338ca;
-            padding: 28px;
+            padding: 18px 24px;
             border-radius: 18px;
-            font-size: 38px;
+            font-size: 30px;
             font-weight: bold;
-            margin-bottom: 20px;
+            margin-bottom: 14px;
         }
-        .question-image img { max-width: 100%; max-height: 45vh; border-radius: 12px; }
-        #timerBig { font-size: 110px; font-weight: bold; color: var(--primary); line-height: 1; }
+        .question-image { padding: 6px !important; margin-bottom: 14px; }
+        .question-image img { max-width: 100%; max-height: 30vh; border-radius: 12px; }
+        #timerBig { font-size: 90px; font-weight: bold; color: var(--primary); line-height: 1; }
         #timerBig.urgent { color: #f87171; animation: blink 1s infinite; }
         @keyframes blink { 50% { opacity: 0.35; } }
-        .statrow { display: flex; justify-content: center; gap: 60px; flex-wrap: wrap; }
-        .stat .num { font-size: 90px; font-weight: bold; color: var(--green); line-height: 1; }
-        .stat .lbl { font-size: 20px; color: var(--muted); text-transform: uppercase; letter-spacing: 2px; }
+        .statrow { display: flex; justify-content: center; align-items: center; gap: 50px; flex-wrap: wrap; }
+        .stat .num { font-size: 72px; font-weight: bold; color: var(--green); line-height: 1; }
+        .stat .lbl { font-size: 18px; color: var(--muted); text-transform: uppercase; letter-spacing: 2px; margin-top: 6px; }
+        .join-stat .qrbox { padding: 8px; }
+        .join-stat .lbl { text-transform: none; letter-spacing: 0; }
+        .join-stat .url { font-size: 15px; margin-top: 2px; }
         .bigemoji { font-size: 90px; animation: bob 2s ease-in-out infinite; display: inline-block; }
         @keyframes bob { 50% { transform: translateY(-10px); } }
         .sub { color: var(--muted); font-size: 24px; }
@@ -141,11 +145,8 @@
             <div class="statrow">
                 <div class="stat"><div class="num" id="answerCount">0</div><div class="lbl">Locked in</div></div>
                 <div class="stat"><div id="timerBig">–</div><div class="lbl">Time left</div></div>
+                <div class="stat join-stat"><div id="qrMiniA" class="qrbox"></div><div class="lbl">📱 Scan to join</div><div class="url" id="urlMiniA"></div></div>
             </div>
-        </div>
-        <div class="card join-mini">
-            <div id="qrMiniA" class="qrbox"></div>
-            <div class="join-text"><div class="sub">📱 Scan to join</div><div class="url" id="urlMiniA"></div></div>
         </div>
     </div>
 
@@ -158,11 +159,8 @@
                 <div class="stat"><div class="num" id="voteAnswers">0</div><div class="lbl">Answers</div></div>
                 <div class="stat"><div class="num" id="voteCount">0</div><div class="lbl">Votes cast</div></div>
                 <div class="stat"><div class="num" id="critCount">0</div><div class="lbl">Critiques</div></div>
+                <div class="stat join-stat"><div id="qrMiniV" class="qrbox"></div><div class="lbl">📱 Scan to join</div><div class="url" id="urlMiniV"></div></div>
             </div>
-        </div>
-        <div class="card join-mini">
-            <div id="qrMiniV" class="qrbox"></div>
-            <div class="join-text"><div class="sub">📱 Scan to join</div><div class="url" id="urlMiniV"></div></div>
         </div>
     </div>
 
