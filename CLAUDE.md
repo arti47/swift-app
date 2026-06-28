@@ -65,7 +65,7 @@ cleverness.
 | `index.html` | **Student app.** Phase-aware: identity gate (pick name + PIN) → waiting → answer form → locked → voting feed → podium/self-compare. Roster+PIN identity, draft auto-save, vote/critique budgets. |
 | `teacher.html` | **Teacher console** (private, on the teacher's laptop/iPad). PIN-gated. Split into two tabs: **🎬 Run Lesson** (live: sticky phase-aware control bar with step strip + one highlighted next-step button, counts & timer, push questions ad-hoc or next-in-sequence, validate podium, star critiques, spotlight, live feed, leaderboard) and **🛠 Setup** (classes, lesson builder, QR/join, CSV export, danger zone). Tab choice persists in `localStorage` (`swift-teacher-tab`). |
 | `projector.html` | **Read-only classroom display** (the big screen). Phase-aware, **anonymity-safe** (never shows names during voting), runs the podium reveal + standings, shows spotlighted answers, and (teacher-triggered at podium) the full-screen model answer for debrief. No PIN. |
-| `review.html` | **Student revision book.** Pick a name → enter that student's PIN (if set) → see all past answers, feedback received, and model answers; print/save-as-PDF. |
+| `review.html` | **Student revision book.** Pick **class** → pick **name** from that class's roster (so a student in any class — not just the live one — can find themselves; free-type fallback if classes are unreadable/empty) → enter that student's PIN (if set) → see all past answers, feedback received, and model answers, with an optional **paper (lesson) filter**; print/save-as-PDF. Reads `classes` + `settings/activeClass` (to default the class) + `rounds`/`posts`; writes nothing to the DB. |
 | `firebase-config.js` | Firebase project config (shared by all pages). Contains the teacher's real keys. |
 | `qrcode.min.js` | Vendored MIT QR generator (davidshimjs/qrcodejs). Used by `teacher.html` + `projector.html` to render the join QR **locally** (same-origin) — no third-party image service. Must be deployed with the folder. |
 | `CLAUDE.md` | This file. |
@@ -248,11 +248,9 @@ full agreed spec is in §7.1. The other items remain open.
   answer for future questions (builds a bank of worked examples).
 
 **B. Reliability & data safety**
-- **`review.html` name-match bug** — `doLoadBook()` matches a student by
-  `name.toLowerCase()` only, while every other page uses `nameKey()` (which ALSO
-  strips `.#$[]/` punctuation). A name like `O'Brien` / `J.Tan` can therefore fail
-  to match its own history in the revision book. Fix: use the shared `nameKey()`
-  rule when comparing in `review.html`. Low-risk, high-value.
+- ~~**`review.html` name-match bug**~~ — FIXED 2026-06-28: `review.html` now
+  matches by `nameKey()` (lowercase + strip `.#$[]/`) like the rest of the app,
+  so punctuated names match their own history.
 - **Backup before 30-day cleanup** — `deleteOldRounds()` destroys the `rounds`
   history that `review.html` AND the question bank depend on, with no safety net.
   Add an auto-CSV-export (or "are you sure, here's the export first") step.
@@ -371,6 +369,18 @@ re-drag to Netlify (no rules change needed for this feature).
 ## 9. Changelog
 
 Keep newest first. One line per meaningful change. Dates in YYYY-MM-DD.
+
+- 2026-06-28 — **`review.html`: class picker + paper filter + name-match fix.**
+  The revision book now lets a student **pick their class first** (loaded from
+  `classes`, defaulting to the active class), then pick their name from THAT
+  class's roster — previously only the live/active class's roster was offered, so
+  students in other classes couldn't find themselves (free-type fallback kept for
+  when `classes` is empty/denied). Added a **📄 paper (lesson) filter** to scope the
+  book to one lesson (papers derived from `rounds/<id>.lesson`; shown only when the
+  student has answers across >1 paper). Matching switched from `name.toLowerCase()`
+  to the shared **`nameKey()`** rule so punctuated names match their own history.
+  Reads `classes` + `settings/activeClass` (both already allowed by rules) — **no
+  new Firebase path, no rules change**. New per-device key `swift-review-class`.
 
 - 2026-06-28 — **Docs/roadmap only (no code change).** Reorganised §7 into a
   full improvement map (A teaching effectiveness, B reliability & data safety,

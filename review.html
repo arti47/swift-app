@@ -97,11 +97,12 @@
         .star { color: var(--gold); }
         .winbanner { color: var(--gold); font-weight: bold; }
         a { color: var(--primary); }
+        .qpaper { color: var(--primary); margin-left: 8px; white-space: nowrap; }
 
         @media print {
             body { background: white; color: #111; }
             .card, .qhead { background: white; border-color: #ccc; color: #111; box-shadow: none; }
-            #picker, #printBtn, .backlink { display: none !important; }
+            #picker, #printBtn, .backlink, #paperFilterCard { display: none !important; }
             .crit { color: #333; }
             .muted, .qdate { color: #555; }
         }
@@ -116,8 +117,11 @@
     <div class="card" id="picker">
         <strong>Who are you?</strong>
         <div style="margin-top:10px;">
+            <select id="classSel" class="hidden" onchange="classChanged()"></select>
+        </div>
+        <div style="margin-top:10px;">
             <select id="nameSel" class="hidden"></select>
-            <input type="text" id="nameInput" placeholder="Type your name exactly as you used in class">
+            <input type="text" id="nameInput" class="hidden" placeholder="Type your name exactly as you used in class">
         </div>
         <button onclick="loadBook()">📖 Show My Work</button>
     </div>
@@ -129,6 +133,11 @@
             <div><div class="num" id="sumPod">0</div><div class="lbl">Podium finishes</div></div>
         </div>
         <button id="printBtn" onclick="window.print()">🖨 Print / Save as PDF</button>
+    </div>
+
+    <div id="paperFilterCard" class="card hidden">
+        <strong>📄 Show which paper?</strong>
+        <div style="margin-top:10px;"><select id="paperSel" onchange="renderBook()"></select></div>
     </div>
 
     <div id="bookContainer"></div>
@@ -173,21 +182,78 @@
         ).join('');
     }
 
-    let roster = [];
-    ref('settings/roster').once('value').then(snap => {
-        roster = snap.val() || [];
-        const saved = localStorage.getItem('swift-name') || '';
-        if (roster.length) {
-            const sel = document.getElementById('nameSel');
-            sel.innerHTML = '<option value="">— pick your name —</option>' +
-                roster.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
-            if (roster.includes(saved)) sel.value = saved;
-            sel.classList.remove('hidden');
-            document.getElementById('nameInput').classList.add('hidden');
-        } else {
-            document.getElementById('nameInput').value = saved;
-        }
+    // Class picker: the student first chooses THEIR class (which may differ from
+    // the teacher's currently-active class), then picks their name from that
+    // class's roster. Falls back to free-typing a name if classes can't be read
+    // (rules denied) or none exist. Loads all classes + the active class (to
+    // preselect a sensible default).
+    let allClasses = {};
+    let activeSlot = null;
+
+    Promise.all([
+        ref('classes').once('value').catch(() => ({ val: () => null })),
+        ref('settings/activeClass').once('value').catch(() => ({ val: () => null }))
+    ]).then(([cSnap, aSnap]) => {
+        allClasses = cSnap.val() || {};
+        const ac = aSnap.val();
+        activeSlot = ac && ac.slot != null ? String(ac.slot) : null;
+        initPicker();
     });
+
+    function initPicker() {
+        const classSel = document.getElementById('classSel');
+        const slots = Object.keys(allClasses)
+            .filter(k => allClasses[k] && (allClasses[k].name || (allClasses[k].roster || []).length));
+        if (slots.length) {
+            classSel.innerHTML = '<option value="">— pick your class —</option>' +
+                slots.map(k => `<option value="${esc(k)}">${esc(allClasses[k].name || ('Class ' + k))}</option>`).join('') +
+                '<option value="__other">✋ Other / type my name</option>';
+            const pref = localStorage.getItem('swift-review-class');
+            if (pref && slots.includes(pref)) classSel.value = pref;
+            else if (activeSlot && slots.includes(activeSlot)) classSel.value = activeSlot;
+            classSel.classList.remove('hidden');
+            classChanged();
+        } else {
+            // No classes available — old behaviour: just free-type the name.
+            const inp = document.getElementById('nameInput');
+            inp.classList.remove('hidden');
+            inp.value = localStorage.getItem('swift-name') || '';
+        }
+    }
+
+    function classChanged() {
+        const v = document.getElementById('classSel').value;
+        const nameSel = document.getElementById('nameSel');
+        const nameInput = document.getElementById('nameInput');
+        if (v && v !== '__other') localStorage.setItem('swift-review-class', v);
+
+        if (!v) { nameSel.classList.add('hidden'); nameInput.classList.add('hidden'); return; }
+        if (v === '__other') {
+            nameSel.classList.add('hidden');
+            nameInput.classList.remove('hidden');
+            return;
+        }
+        const roster = (allClasses[v] && allClasses[v].roster) || [];
+        if (!roster.length) {
+            nameSel.classList.add('hidden');
+            nameInput.classList.remove('hidden');
+            return;
+        }
+        const saved = localStorage.getItem('swift-name') || '';
+        nameSel.innerHTML = '<option value="">— pick your name —</option>' +
+            roster.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+        if (roster.includes(saved)) nameSel.value = saved;
+        nameSel.classList.remove('hidden');
+        nameInput.classList.add('hidden');
+    }
+
+    function selectedName() {
+        const nameSel = document.getElementById('nameSel');
+        const nameInput = document.getElementById('nameInput');
+        if (!nameSel.classList.contains('hidden') && nameSel.value) return nameSel.value;
+        if (!nameInput.classList.contains('hidden')) return nameInput.value.trim();
+        return '';
+    }
 
     function nameKey(name) {
         return (name || '').trim().toLowerCase().replace(/[.#$\[\]\/]/g, '') || 'anonymous';
@@ -196,10 +262,8 @@
     // Gate the book behind the student's personal PIN (set in the Arena app).
     // If no PIN exists for that name (or the rules block reads), open it.
     function loadBook() {
-        const name = roster.length
-            ? document.getElementById('nameSel').value
-            : document.getElementById('nameInput').value.trim();
-        if (!name) { alert('Pick or type your name first.'); return; }
+        const name = selectedName();
+        if (!name) { alert('Pick your class and your name first.'); return; }
 
         ref('identities/' + nameKey(name)).once('value').then(snap => {
             const rec = snap.val();
@@ -212,90 +276,132 @@
         }).catch(() => doLoadBook(name));
     }
 
-    function doLoadBook(name) {
-        const me = name.toLowerCase();
+    // Loaded book is kept in memory so the paper filter can re-render without
+    // re-fetching. Matching uses nameKey() — the SAME rule the rest of the app
+    // uses (lowercase + strip .#$[]/) — so punctuated names ("O'Brien", "J.Tan")
+    // still match their own history.
+    let book = { name: '', rounds: {}, posts: {} };
 
+    function doLoadBook(name) {
+        localStorage.setItem('swift-name', name);
         Promise.all([
             ref('rounds').once('value'),
             ref('posts').once('value')
         ]).then(([rSnap, pSnap]) => {
-            const rounds = rSnap.val() || {};
-            const allPosts = pSnap.val() || {};
-            const roundIds = Object.keys(allPosts).sort(); // chronological
-
-            let qCount = 0, fbCount = 0, podCount = 0;
-            const blocks = [];
-
-            roundIds.forEach((rid, idx) => {
-                const posts = allPosts[rid] || {};
-                const meta = rounds[rid] || {};
-                const myEntry = Object.entries(posts).find(([id, p]) =>
-                    (p.name || '').trim().toLowerCase() === me);
-                if (!myEntry) return;
-                const [myId, mine] = myEntry;
-                qCount++;
-
-                const ts = meta.startedAt || parseInt(rid.slice(1), 10);
-                const date = isNaN(ts) ? '' : new Date(ts).toLocaleDateString();
-                const crits = Object.values(mine.critiques || {});
-                fbCount += crits.length;
-
-                const podium = meta.podium || null;
-                let podLine = '';
-                if (podium) {
-                    const places = [['first', '🥇'], ['second', '🥈'], ['third', '🥉']];
-                    for (const [place, medal] of places) {
-                        if (podium[place] && (podium[place].name || '').trim().toLowerCase() === me) {
-                            podCount++;
-                            podLine = `<p class="winbanner">${medal} You made the podium on this question!</p>`;
-                            break;
-                        }
-                    }
-                }
-
-                // The teacher's pre-authored model answer for this question, if any.
-                let teacherModelHtml = '';
-                if (meta.model && DIMS.some(([k]) => meta.model[k])) {
-                    teacherModelHtml = `<span class="section-tag tag-model">🎯 TEACHER'S MODEL ANSWER</span>
-                        ${renderDims(meta.model)}`;
-                }
-
-                let modelHtml = '';
-                if (podium && podium.first) {
-                    if (podium.first.id === myId) {
-                        modelHtml = `<p class="winbanner">🏆 YOUR answer was the class champion!</p>`;
-                    } else if (posts[podium.first.id]) {
-                        modelHtml = `<span class="section-tag tag-model">🏆 CLASS CHAMPION (by ${esc(podium.first.name)})</span>
-                            ${renderDims(posts[podium.first.id])}`;
-                    }
-                }
-
-                blocks.push(`<div class="card">
-                    <div class="qhead">Q${qCount}. ${esc(meta.question || '(question not recorded)')}
-                        <div class="qdate">${date} · 👍 ${mine.upvotes || 0} votes</div>
-                    </div>
-                    ${meta.image ? `<div style="text-align:center; margin:10px 0;"><img src="${meta.image}" style="max-width:100%; max-height:300px; border-radius:8px;"></div>` : ''}
-                    ${podLine}
-                    <span class="section-tag tag-mine">MY ANSWER</span>
-                    ${renderDims(mine)}
-                    ${crits.length ? `<span class="section-tag tag-fb">FEEDBACK I RECEIVED</span>
-                        ${crits.map(c => `<div class="crit">${c.starred ? '<span class="star">⭐</span> ' : ''}<em>${esc(c.by)}:</em>
-                            <b>A:</b> ${esc(c.affirm)} · <b>C:</b> ${esc(c.clarify)} · <b>S:</b> ${esc(c.suggest)}</div>`).join('')}` : ''}
-                    ${teacherModelHtml}
-                    ${modelHtml}
-                </div>`);
-            });
-
-            document.getElementById('sumQ').textContent = qCount;
-            document.getElementById('sumFb').textContent = fbCount;
-            document.getElementById('sumPod').textContent = podCount;
-            document.getElementById('bookSummary').classList.remove('hidden');
-            document.getElementById('bookContainer').innerHTML = blocks.length
-                ? blocks.join('')
-                : `<div class="card muted" style="text-align:center;">No answers found for "${esc(name)}". Check the spelling matches what you used in class.</div>`;
+            book = { name, rounds: rSnap.val() || {}, posts: pSnap.val() || {} };
+            buildPaperFilter();
+            renderBook();
         }).catch(err => {
             alert('Could not load — check your internet connection. (' + err.message + ')');
         });
+    }
+
+    // Populate the paper (lesson) filter from the papers this student actually
+    // has answers in, plus "All papers" and "Ad-hoc (no paper)". Only shown when
+    // there's more than one bucket to choose between.
+    function buildPaperFilter() {
+        const me = nameKey(book.name);
+        const papers = {};       // slot -> name
+        let hasAdhoc = false;
+        Object.keys(book.posts).forEach(rid => {
+            const mine = Object.values(book.posts[rid] || {}).some(p => nameKey(p.name) === me);
+            if (!mine) return;
+            const lesson = (book.rounds[rid] || {}).lesson;
+            if (lesson && lesson.slot != null) papers[String(lesson.slot)] = lesson.name || ('Paper ' + lesson.slot);
+            else hasAdhoc = true;
+        });
+        const slots = Object.keys(papers);
+        let html = '<option value="all">All papers</option>';
+        slots.forEach(s => html += `<option value="${esc(s)}">${esc(papers[s])}</option>`);
+        if (hasAdhoc) html += '<option value="none">Ad-hoc (no paper)</option>';
+        document.getElementById('paperSel').innerHTML = html;
+        document.getElementById('paperFilterCard').classList
+            .toggle('hidden', slots.length + (hasAdhoc ? 1 : 0) < 2);
+    }
+
+    function renderBook() {
+        const name = book.name;
+        const me = nameKey(name);
+        const filter = document.getElementById('paperSel').value || 'all';
+        const rounds = book.rounds, allPosts = book.posts;
+        const roundIds = Object.keys(allPosts).sort(); // chronological
+
+        let qCount = 0, fbCount = 0, podCount = 0;
+        const blocks = [];
+
+        roundIds.forEach(rid => {
+            const posts = allPosts[rid] || {};
+            const meta = rounds[rid] || {};
+
+            // Paper filter (lesson tag lives on rounds/<id>.lesson = {slot,name})
+            const lesson = meta.lesson;
+            if (filter === 'none') { if (lesson && lesson.slot != null) return; }
+            else if (filter !== 'all') { if (!lesson || String(lesson.slot) !== filter) return; }
+
+            const myEntry = Object.entries(posts).find(([id, p]) => nameKey(p.name) === me);
+            if (!myEntry) return;
+            const [myId, mine] = myEntry;
+            qCount++;
+
+            const ts = meta.startedAt || parseInt(rid.slice(1), 10);
+            const date = isNaN(ts) ? '' : new Date(ts).toLocaleDateString();
+            const crits = Object.values(mine.critiques || {});
+            fbCount += crits.length;
+            const paperTag = (lesson && lesson.name) ? `<span class="qpaper">📄 ${esc(lesson.name)}</span>` : '';
+
+            const podium = meta.podium || null;
+            let podLine = '';
+            if (podium) {
+                const places = [['first', '🥇'], ['second', '🥈'], ['third', '🥉']];
+                for (const [place, medal] of places) {
+                    if (podium[place] && nameKey(podium[place].name) === me) {
+                        podCount++;
+                        podLine = `<p class="winbanner">${medal} You made the podium on this question!</p>`;
+                        break;
+                    }
+                }
+            }
+
+            // The teacher's pre-authored model answer for this question, if any.
+            let teacherModelHtml = '';
+            if (meta.model && DIMS.some(([k]) => meta.model[k])) {
+                teacherModelHtml = `<span class="section-tag tag-model">🎯 TEACHER'S MODEL ANSWER</span>
+                    ${renderDims(meta.model)}`;
+            }
+
+            let modelHtml = '';
+            if (podium && podium.first) {
+                if (podium.first.id === myId) {
+                    modelHtml = `<p class="winbanner">🏆 YOUR answer was the class champion!</p>`;
+                } else if (posts[podium.first.id]) {
+                    modelHtml = `<span class="section-tag tag-model">🏆 CLASS CHAMPION (by ${esc(podium.first.name)})</span>
+                        ${renderDims(posts[podium.first.id])}`;
+                }
+            }
+
+            blocks.push(`<div class="card">
+                <div class="qhead">Q${qCount}. ${esc(meta.question || '(question not recorded)')}
+                    <div class="qdate">${date} · 👍 ${mine.upvotes || 0} votes${paperTag}</div>
+                </div>
+                ${meta.image ? `<div style="text-align:center; margin:10px 0;"><img src="${meta.image}" style="max-width:100%; max-height:300px; border-radius:8px;"></div>` : ''}
+                ${podLine}
+                <span class="section-tag tag-mine">MY ANSWER</span>
+                ${renderDims(mine)}
+                ${crits.length ? `<span class="section-tag tag-fb">FEEDBACK I RECEIVED</span>
+                    ${crits.map(c => `<div class="crit">${c.starred ? '<span class="star">⭐</span> ' : ''}<em>${esc(c.by)}:</em>
+                        <b>A:</b> ${esc(c.affirm)} · <b>C:</b> ${esc(c.clarify)} · <b>S:</b> ${esc(c.suggest)}</div>`).join('')}` : ''}
+                ${teacherModelHtml}
+                ${modelHtml}
+            </div>`);
+        });
+
+        document.getElementById('sumQ').textContent = qCount;
+        document.getElementById('sumFb').textContent = fbCount;
+        document.getElementById('sumPod').textContent = podCount;
+        document.getElementById('bookSummary').classList.remove('hidden');
+        document.getElementById('bookContainer').innerHTML = blocks.length
+            ? blocks.join('')
+            : `<div class="card muted" style="text-align:center;">No answers found for "${esc(name)}"${filter !== 'all' ? ' in this paper — try “All papers”.' : '. Check the spelling matches what you used in class.'}</div>`;
     }
 </script>
 
