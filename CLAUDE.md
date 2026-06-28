@@ -234,14 +234,54 @@ Teacher: `swift-teacher-pin`, `swift-runner-<lessonSlot>` (next-question pointer
 ## 7. Roadmap / backlog (not yet built)
 
 Ordered roughly by teaching value. Confirm scope with the teacher before building.
+The improvement map below was reviewed with the teacher on 2026-06-28; the teacher
+prioritised **teaching effectiveness**, and within it the **Question Bank**, whose
+full agreed spec is in §7.1. The other items remain open.
 
+**A. Teaching effectiveness**
+- **Question bank (reuse past questions)** — NEXT UP; full spec in §7.1 below.
 - **Mark-scheme overlay for "Tally the Marks"** — optional official mark
   allocation attached to a question, revealed at podium (predict → verify).
 - **Per-dimension trend over time** — track which dimension the class is weakest
-  on across lessons (data already in CSV; needs a teacher-facing view).
-- **Question bank polish** — richer library/search beyond the 10 lesson slots.
+  on across lessons (data already in CSV / `selfcheck`; needs a teacher view).
+- **Exemplar library** — save any strong student/model answer as a reusable model
+  answer for future questions (builds a bank of worked examples).
+
+**B. Reliability & data safety**
+- **`review.html` name-match bug** — `doLoadBook()` matches a student by
+  `name.toLowerCase()` only, while every other page uses `nameKey()` (which ALSO
+  strips `.#$[]/` punctuation). A name like `O'Brien` / `J.Tan` can therefore fail
+  to match its own history in the revision book. Fix: use the shared `nameKey()`
+  rule when comparing in `review.html`. Low-risk, high-value.
+- **Backup before 30-day cleanup** — `deleteOldRounds()` destroys the `rounds`
+  history that `review.html` AND the question bank depend on, with no safety net.
+  Add an auto-CSV-export (or "are you sure, here's the export first") step.
+- **Undo for destructive actions** — podium award, score reset, and End Round are
+  guarded only by type-to-confirm; no undo once done.
+
+**C. Security hardening** (all "by design" today, but candidates if it matters)
+- DB is world-read/write; security is obscure-URL + client-side PIN only. Anyone
+  with a room code can read or wipe everything. **Firebase rules with validation**
+  (shape/size caps, lock `migrated` once set, cap image bytes) would harden this
+  without adding student logins. NOTE: any such change is a **rules edit** the
+  teacher must apply in the Firebase console.
+- PINs are stored in **plaintext** at `identities/<nameKey>` and `settings/pin`.
+
+**D. UX polish**
+- Student: clearer "disconnected — don't retype" affordances around the existing
+  reconnect banner.
+- Teacher: keyboard shortcuts for the live phase buttons; the live feed can still
+  be a wall of text in a big class.
+- Projector: font-size scaling for very large rooms.
 - **Per-room teacher PIN reset / room admin** — no way yet to change a room's PIN
   or delete a room from the console (edit the DB directly if needed).
+
+**E. Code maintainability**
+- `DIMS`, `esc()`, `renderDims()`, `ref()`, the room-resolution snippet, and the
+  countdown timer are **copy-pasted across all 4 HTML files** and drift over time.
+  A shared `swift-common.js` would cut the duplication — but it bends the
+  "one self-contained file, one inline `<script>`" convention (§2, §5) and the
+  syntax-check tooling, so weigh that trade-off with the teacher first.
 
 ### Known limitations (by design, not bugs)
 - No server-side enforcement (budgets/PIN are client-side).
@@ -249,6 +289,66 @@ Ordered roughly by teaching value. Confirm scope with the teacher before buildin
 - `review.html` only shows model answers for rounds validated after that feature
   shipped (older rounds have no stored podium); the 30-day cleanup erases history
   the revision book relies on — advise cleaning up only after exams.
+
+---
+
+## 7.1 Question Bank — agreed spec (NEXT UP, not yet built)
+
+Agreed with the teacher 2026-06-28. **Goal:** reuse past questions instead of
+retyping them. **Key constraint chosen:** build it **from the `rounds` history
+that is already stored** — so there is **NO new Firebase path and NO rules
+change**; deploy is a plain re-drag to Netlify.
+
+**Where it lives:** UPGRADE the existing **🗂 Past Questions** card in the Setup
+tab (don't add a separate card). Keep the current read-only review behaviour
+(`showHistoryRound()`); the bank *adds* search + reuse actions, it doesn't replace
+the viewer. Existing scaffolding to build on: `loadHistory()` (loads `rounds` +
+`posts` into `historyRounds`/`historyPosts`), `populateExportFilters()` (already
+builds class/lesson option lists), `pushQuestion()`, `pushRedo()`, `addToLesson()`,
+`setModelForm()` / `expandModel()`, `questionImage`, `classTag()`.
+
+**1. Build a deduped list** (new helper, e.g. `buildQuestionBank()`), from
+`historyRounds`:
+- Normalize a key per round: trim, strip a leading `"(Redo) "`, lowercase — so a
+  question and its redos collapse together.
+- **Collapse duplicates:** keep the **most recent** round per key (max
+  `startedAt`); prefer a version that HAS a `model` so the kept entry carries an
+  exemplar where one exists.
+- **Include image-only ad-hoc questions** (text === `"Analyze the image using
+  S.W.I.F.T."`): keep them, grouped by their `image` string, labelled by date /
+  thumbnail since the image *is* the question.
+- Each entry retains: `question`, `image`, `model`, `class`, `lesson`,
+  `startedAt`, and the source `roundId`.
+
+**2. Search & filter UI** (above the existing dropdown), re-rendering on change:
+- Text search box (case-insensitive substring on question text).
+- Class `<select>` + Lesson `<select>` (reuse the `populateExportFilters()`
+  pattern; tags already live on `rounds/<id>.class` / `.lesson`).
+- Checkbox "only questions with a model answer" (filter where
+  `model && DIMS.some(([k]) => model[k])`).
+
+**3. Four reuse actions per result row** (all carry the stored image + model):
+- **Push live now** — same payload shape as `pushQuestion()` but seeded from the
+  entry; write the `rounds/<newId>` record with `classTag()`; respect
+  `confirmNoClass()` / `confirmInterrupt()`.
+- **Add to a lesson slot** — append `{q, image, mins, vote, crit, model}` to the
+  chosen lesson's `questions` (mirror `addToLesson()`).
+- **Load into composer** — set the compose textarea, image preview
+  (`questionImage`), and model form (`setModelForm()`, then `expandModel()` if a
+  model exists), so the teacher can tweak before saving/pushing.
+- **Duplicate as redo** — like `pushRedo()` but seeded from the entry; set
+  `redoOf` to the entry's source `roundId` and `"(Redo) "` prefix on the `rounds`
+  record.
+
+**Docs to update when built** (per the standing instruction): the Past Questions
+description in §6, and a Changelog entry. No §4 data-model change (nothing new is
+stored). **Caveat:** the bank only reaches as far back as `rounds` is retained —
+the 30-day cleanup truncates it, which is why item B "backup before cleanup"
+pairs naturally with this.
+
+**Conventions to respect while building:** `esc()` all rendered question text
+before `innerHTML`; keep the one-inline-`<script>` rule; remind the teacher to
+re-drag to Netlify (no rules change needed for this feature).
 
 ---
 
@@ -271,6 +371,16 @@ Ordered roughly by teaching value. Confirm scope with the teacher before buildin
 ## 9. Changelog
 
 Keep newest first. One line per meaningful change. Dates in YYYY-MM-DD.
+
+- 2026-06-28 — **Docs/roadmap only (no code change).** Reorganised §7 into a
+  full improvement map (A teaching effectiveness, B reliability & data safety,
+  C security hardening, D UX polish, E maintainability) from a planning session
+  with the teacher, and added **§7.1 — the agreed Question Bank spec** (reuse past
+  questions, built from `rounds` history → no new Firebase path / no rules change;
+  upgrades the 🗂 Past Questions card with search + Push-live / Add-to-lesson /
+  Load-into-composer / Duplicate-as-redo). Also logged the **`review.html`
+  name-match bug** (matches by `name.toLowerCase()` instead of `nameKey()`, so
+  punctuated names can miss their own history) as a known fix. Nothing built yet.
 
 - 2026-06-22 — Timer now arrives **ready-but-paused at its full duration**
   (default 3 min) when a question is pushed, instead of auto-running. The Run-bar
